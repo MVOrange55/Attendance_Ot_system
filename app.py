@@ -3,12 +3,10 @@ import pandas as pd
 from datetime import datetime, time, timedelta
 import io
 
-# --- पेज सेटिंग्स ---
 st.set_page_config(page_title="Final OT Calculator", layout="wide")
-st.title("📊 Attendance & OT System (Vertical Block Format)")
+st.title("📊 Attendance & OT System")
 
 def round_ot(hours):
-    """Rounding Rule: <15=0, 15-29=0.25, 30-44=0.50, 45-59=0.75, 60=1.0"""
     if hours <= 0: return 0
     full_hours = int(hours)
     rem = (hours - full_hours) * 60
@@ -22,98 +20,90 @@ def round_ot(hours):
     return full_hours + rounded
 
 def process_data(df):
-    # डेटा क्लीनिंग: Emp ID और Name को नीचे तक भरना ताकि हर लाइन पहचानी जा सके
-    df['Emp ID'] = df['Emp ID'].ffill()
-    df['Name'] = df['Name'].ffill()
+    # 1. ऑटोमैटिक कॉलम ढूंढना (ताकि स्पेलिंग की गलती न हो)
+    cols = df.columns.tolist()
     
-    # तारीख वाले कॉलम्स (1 to 31) को पहचानना
-    date_cols = [c for c in df.columns if str(c).isdigit()]
-    std_hrs = 8.5 # 9:30 AM to 6:00 PM का स्टैंडर्ड टाइम
+    # Emp ID कॉलम ढूंढना
+    emp_id_col = next((c for c in cols if 'id' in str(c).lower()), None)
+    # Name कॉलम ढूंढना
+    name_col = next((c for c in cols if 'name' in str(c).lower()), None)
+    # Status/Type कॉलम ढूंढना
+    status_col = next((c for c in cols if 'status' in str(c).lower() or 'type' in str(c).lower() or 'date' in str(c).lower()), None)
 
+    if not emp_id_col or not status_col:
+        st.error(f"Excel में सही कॉलम नहीं मिले! आपकी फाइल में ये कॉलम हैं: {cols}")
+        return None
+
+    # सफाई
+    df[emp_id_col] = df[emp_id_col].ffill()
+    if name_col: df[name_col] = df[name_col].ffill()
+    
+    date_cols = [c for c in cols if str(c).strip().isdigit()]
+    std_hrs = 8.5
     ot_records = []
 
-    # हर यूनिक कर्मचारी के डेटा ब्लॉक पर लूप
-    for eid in df['Emp ID'].unique():
-        emp_block = df[df['Emp ID'] == eid]
-        name = emp_block['Name'].iloc[0]
-        
+    for eid in df[emp_id_col].unique():
+        emp_block = df[df[emp_id_col] == eid]
+        name = emp_block[name_col].iloc[0] if name_col else str(eid)
         row_summary = {"Emp ID": eid, "Name": name}
         
-        # ब्लॉक के अंदर Status, In Time और Out Time वाली लाइनों को अलग करना
-        status_row = emp_block[emp_block['Status'].isin(['P', 'A', 'WO', 'Status'])]
-        in_row = emp_block[emp_block['Status'].str.contains('In', case=False, na=False)]
-        out_row = emp_block[emp_block['Status'].str.contains('Out', case=False, na=False)]
+        # ब्लॉक पहचानना
+        status_rows = emp_block[emp_block[status_col].astype(str).str.contains('P|A|WO|Status', case=False, na=False)]
+        in_rows = emp_block[emp_block[status_col].astype(str).str.contains('In', case=False, na=False)]
+        out_rows = emp_block[emp_block[status_col].astype(str).str.contains('Out', case=False, na=False)]
 
         for day in date_cols:
             try:
-                # वैल्यूज निकालना
-                current_status = str(status_row[day].values[0]).strip().upper()
-                in_val = str(in_row[day].values[0]).strip()
-                out_val = str(out_row[day].values[0]).strip()
+                current_status = str(status_rows[day].values[0]).strip().upper() if not status_rows.empty else 'A'
+                out_val = str(out_rows[day].values[0]).strip() if not out_rows.empty else ''
 
-                # अगर एब्सेंट है या डेटा अधूरा है
-                if current_status == 'A' or not out_val or out_val.lower() == 'nan':
+                if 'A' in current_status or not out_val or out_val.lower() == 'nan' or out_val == "":
                     row_summary[day] = 0
                     continue
 
                 fmt = '%H:%M'
-                # In Time Rule: अगर 9:30 से पहले है तो 9:30 माना जाएगा
+                t_in = time(9, 30) # Default
                 try:
-                    t_in_raw = datetime.strptime(in_val, fmt).time()
-                    t_in = max(t_in_raw, time(9, 30))
+                    t_out = datetime.strptime(out_val, fmt).time()
                 except:
-                    t_in = time(9, 30)
+                    # अगर समय 07:30 PM फॉर्मेट में हो
+                    t_out = datetime.strptime(out_val, '%I:%M %p').time()
 
-                # Out Time
-                t_out = datetime.strptime(out_val, fmt).time()
-
-                # कैलकुलेशन के लिए तारीख जोड़ना
                 dt_in = datetime.combine(datetime.today(), t_in)
                 dt_out = datetime.combine(datetime.today(), t_out)
-                
-                # नाइट शिफ्ट के लिए (अगर आउट टाइम अगले दिन का हो)
                 if dt_out <= dt_in: dt_out += timedelta(days=1)
                 
-                total_working_hrs = (dt_out - dt_in).total_seconds() / 3600
+                total_hrs = (dt_out - dt_in).total_seconds() / 3600
 
-                # --- OT कैलकुलेशन नियम ---
-                if current_status == 'WO':
-                    # Week Off: पूरा वर्किंग टाइम OT है
-                    ot_hrs = total_working_hrs
-                elif current_status == 'P':
-                    # Present: 8.5 घंटे काटकर बाकी OT (हाफ डे का नियम भी इसमें शामिल है)
-                    if t_in > time(10, 16):
-                        ot_hrs = max(0, total_working_hrs - 4) # हाफ डे के लिए 4 घंटे कटौती
-                    else:
-                        ot_hrs = max(0, total_working_hrs - std_hrs)
+                if 'WO' in current_status:
+                    ot_hrs = total_hrs
                 else:
-                    ot_hrs = 0
+                    ot_hrs = max(0, total_hrs - std_hrs)
 
-                # राउंडिंग रूल अप्लाई करना
                 row_summary[day] = round_ot(ot_hrs)
             except:
                 row_summary[day] = 0
         
-        # महीने का टोटल OT कैलकुलेट करना
-        row_summary["Total Month OT"] = sum([row_summary[d] for d in date_cols])
+        row_summary["Total Month OT"] = sum([v for k,v in row_summary.items() if str(k).isdigit()])
         ot_records.append(row_summary)
 
     return pd.DataFrame(ot_records)
 
-# --- यूजर इंटरफेस (UI) ---
-uploaded_file = st.file_uploader("Upload Excel File (Vertical Block Format)", type=['xlsx'])
+uploaded_file = st.file_uploader("Upload Excel File", type=['xlsx'])
 
 if uploaded_file:
+    # फाइल को ऊपर की फालतू Rows हटाकर पढ़ना
     df = pd.read_excel(uploaded_file)
-    st.success("File Loaded!")
     
-    if st.button("🚀 Generate One-Row OT Report"):
+    # अगर पहली रो खाली है तो उसे ठीक करना
+    if 'Emp ID' not in df.columns:
+        df = pd.read_excel(uploaded_file, header=1) # 1 row नीचे से शुरू करेगा
+
+    if st.button("🚀 Generate Report"):
         final_df = process_data(df)
-        st.subheader("✅ Monthly OT Summary")
-        st.dataframe(final_df, use_container_width=True)
-        
-        # डाउनलोड एक्सेल फाइल
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            final_df.to_excel(writer, index=False)
-        st.download_button("📥 Download Final Report", output.getvalue(), "Employee_OT_Report.xlsx")
+        if final_df is not None:
+            st.dataframe(final_df)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                final_df.to_excel(writer, index=False)
+            st.download_button("📥 Download Report", output.getvalue(), "OT_Report.xlsx")
