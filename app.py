@@ -10,7 +10,7 @@ def calculate_final_ot(total_hrs, is_full_ot_day):
     if is_full_ot_day:
         ot_exact = total_hrs
     else:
-        # Normal din: 8.5 hours duty minus (e.g., 9:30 to 18:00)
+        # Normal din: 8.5 hours duty minus
         ot_exact = max(0, total_hrs - 8.5)
     
     if ot_exact <= 0: return 0
@@ -38,7 +38,6 @@ def process_data(df):
         st.error("Excel mein 'Emp ID' aur 'Date/Status' column nahi mila!")
         return None
 
-    # ID aur Name ko niche tak fill karein processing ke liye
     df[emp_id_col] = df[emp_id_col].ffill()
     if name_col: df[name_col] = df[name_col].ffill()
     
@@ -51,12 +50,10 @@ def process_data(df):
         emp_block = df[df[emp_id_col] == eid]
         name = emp_block[name_col].iloc[0] if name_col else "Unknown"
         
-        # Background mein rows identify karein
         st_row = emp_block[emp_block[header_col].astype(str).str.contains('Status|P|A|WO', case=False, na=False)].head(1)
         in_row = emp_block[emp_block[header_col].astype(str).str.contains('In', case=False, na=False)].head(1)
         out_row = emp_block[emp_block[header_col].astype(str).str.contains('Out', case=False, na=False)].head(1)
 
-        # Sirf ek row banayenge is Employee ke liye
         emp_summary = {"Emp ID": eid, "Name": name}
         total_month_ot = 0
 
@@ -78,8 +75,19 @@ def process_data(df):
                     return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
 
                 t_out = parse_t(out_val)
-                # RULE: Holiday/Off par actual In, normal din par fixed 9:30 AM
-                t_in = parse_t(in_val) if (is_full_ot_day and in_val not in ['', 'nan', '0']) else time(9, 30)
+                actual_in = parse_t(in_val)
+                
+                # --- NAYA RULE LOGIC START ---
+                if is_full_ot_day:
+                    t_in = actual_in
+                else:
+                    # Agar 9:30 AM ke baad aur 10:15 AM tak aaye hain (Late arrival)
+                    if actual_in > time(9, 30) and actual_in <= time(10, 15):
+                        t_in = actual_in
+                    else:
+                        # Baaki sabke liye fixed 9:30 AM (Jo jaldi aaye ya 10:15 ke bhi baad aaye)
+                        t_in = time(9, 30)
+                # --- NAYA RULE LOGIC END ---
 
                 dt_in = datetime.combine(datetime.today(), t_in)
                 dt_out = datetime.combine(datetime.today(), t_out)
@@ -107,7 +115,7 @@ if uploaded_file:
     if st.button("🚀 Generate Clean OT Report"):
         final_df = process_data(df_raw)
         if final_df is not None:
-            st.success("Report Taiyar Hai! Isme sirf calculated OT dikhega.")
+            st.success("Report Taiyar Hai! Late arrival (upto 10:15) adjust kar diya gaya hai.")
             st.dataframe(final_df)
             
             output = io.BytesIO()
