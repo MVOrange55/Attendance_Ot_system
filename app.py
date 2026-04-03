@@ -1,114 +1,192 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 
-st.set_page_config(page_title="Orange House HR Pro", layout="wide")
+# --- 1. PERMANENT NAVIGATION LOCK ---
+# Ye list hamesha fix rahegi, code change hone par bhi nahi badlegi
+NAV_MENU = [
+    "Attendance Muster (Monthly)", 
+    "Attendance Summary", 
+    "Exception Report", 
+    "Half Day Report", 
+    "Continuous Absenteeism", 
+    "Late Penalty Report"
+]
 
-# --- CSS for Professional Reports ---
-st.markdown("<style>.header {font-size:24px; font-weight:bold; text-align:center; color:#d35400;} .title {text-align:center; text-decoration:underline;}</style>", unsafe_allow_html=True)
+# --- 2. PAGE CONFIG & BRANDING ---
+st.set_page_config(page_title="Orange House HR System", layout="wide")
 
-# --- Helper: Safe Time Parsing ---
-def parse_t(val):
-    if pd.isna(val) or str(val).strip() == '' or str(val).lower() == 'nan': return None
+# --- 3. ATTRACTIVE CUSTOM CSS ---
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #FFF5EE;
+        border-right: 2px solid #FF4500;
+    }
+    .main-title {
+        color: #D35400;
+        font-size: 38px;
+        font-weight: bold;
+        text-align: center;
+        text-decoration: underline;
+        margin-top: -60px;
+    }
+    .report-header {
+        background: linear-gradient(90deg, #FF4500, #FFA500);
+        color: white;
+        padding: 10px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .stTable {
+        border: 1px solid #FF4500;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 4. UTILS & TIME PARSING ---
+def parse_time_safe(val):
+    if pd.isna(val) or str(val).strip() in ['', 'nan', '00:00']: return None
     try:
         if isinstance(val, time): return val
         if isinstance(val, datetime): return val.time()
-        v_str = str(val).strip()[:5]
-        return datetime.strptime(v_str, '%H:%M').time()
+        t_str = str(val).strip()[:5]
+        return datetime.strptime(t_str, '%H:%M').time()
     except: return None
 
-# --- Session State to Prevent Data Loss ---
-if 'hr_master' not in st.session_state:
-    st.session_state.hr_master = None
-
-# --- Smart Processor ---
-def smart_process(df, holidays):
+# --- 5. DATA ENGINE (4-ROW PATTERN) ---
+def process_hr_data(df, hols):
     # Column cleaning
-    df.columns = [str(c).strip().split('.')[0] for c in df.columns]
-    all_cols = df.columns.tolist()
+    df.columns = [str(c).strip() for c in df.columns]
+    eid_col, name_col = df.columns[0], df.columns[1]
     
-    # Picking first two columns as ID and Name regardless of their spelling
-    eid_col, name_col = all_cols[0], all_cols[1]
+    # Fill ID and Name for the 4-row blocks
     df[eid_col] = df[eid_col].ffill()
     df[name_col] = df[name_col].ffill()
     
-    # Finding date columns (1-31)
-    dates = [c for c in all_cols if c.isdigit() and 1 <= int(c) <= 31]
-    
-    rows = []
-    for eid in df[eid_col].unique():
+    date_cols = [c for c in df.columns if c.isdigit()]
+    processed_data = []
+
+    # Get unique employees
+    ids = df[eid_col].unique()
+    for eid in ids:
         if pd.isna(eid) or "id" in str(eid).lower(): continue
+        
+        # Get the 4 rows for this employee
         block = df[df[eid_col] == eid].reset_index(drop=True)
         if len(block) < 4: continue
         
-        name = block.iloc[0][name_col]
-        for d in dates:
-            day = int(d)
+        emp_name = block.iloc[0][name_col]
+        
+        for d in date_cols:
+            day_idx = int(d)
+            # Pattern: 0=Status, 1=In, 2=Out, 3=Total/Duration
             st_val = str(block.iloc[0][d]).strip().upper()
-            in_t, out_t = parse_t(block.iloc[1][d]), parse_t(block.iloc[2][d])
-            try: dur = float(block.iloc[3][d]) * 24 if pd.notna(block.iloc[3][d]) else 0
+            in_t = parse_time_safe(block.iloc[1][d])
+            out_t = parse_time_safe(block.iloc[2][d])
+            
+            # Duration Calculation
+            try:
+                raw_d = str(block.iloc[3][d])
+                if ':' in raw_d:
+                    h, m = map(int, raw_d.split(':'))
+                    dur = h + (m/60)
+                else:
+                    dur = float(raw_d) * 24
             except: dur = 0
             
-            is_h = (day in holidays) or any(x in st_val for x in ['WO', 'WOP', 'W'])
+            is_holiday = (day_idx in hols) or any(x in st_val for x in ['WO', 'W'])
             
-            # Logic: P, A, HD, Miss Punch
-            res = {"Emp ID": str(eid), "Name": name, "Date": day, "In": in_t, "Out": out_t, "Dur": dur, "Is_H": is_h}
-            if (in_t and not out_t) or (not in_t and out_t):
-                res["Status"], res["Miss"] = "A", 1
-            elif in_t and out_t:
-                res["Miss"] = 0
-                res["Late"] = 1 if in_t > time(9, 35) else 0
-                res["Early"] = 1 if dur < 8.5 and not is_h else 0
-                if 3.5 <= dur <= 5.5: res["Status"] = "HD"
-                elif is_h: res["Status"] = st_val if st_val != "NAN" else "WO"
-                elif in_t >= time(10, 16): res["Status"] = "AB/"
-                else: res["Status"] = "P"
+            entry = {
+                "ID": str(eid), "Name": emp_name, "Date": day_idx, 
+                "In": in_t, "Out": out_t, "Dur": dur, "Is_H": is_holiday
+            }
+            
+            # Logic for Status & Penalties
+            if in_t and out_t:
+                entry["Late"] = 1 if in_t > time(9, 35) else 0 # Late Rule
+                entry["Early"] = 1 if dur < 8.5 and not is_holiday else 0
+                
+                if 3.5 <= dur <= 5.5: entry["Status"] = "HD"
+                elif is_holiday: entry["Status"] = st_val if st_val != "NAN" else "WO"
+                elif in_t >= time(10, 16): entry["Status"] = "AB/"
+                else: entry["Status"] = "P"
+                entry["Miss"] = 0
+            elif in_t or out_t:
+                entry["Status"], entry["Miss"], entry["Late"], entry["Early"] = "A", 1, 0, 0
             else:
-                res["Status"] = st_val if is_h else "A"
-                res["Miss"], res["Late"], res["Early"] = 0, 0, 0
-            rows.append(res)
-    return pd.DataFrame(rows)
+                entry["Status"] = st_val if is_holiday else "A"
+                entry["Miss"], entry["Late"], entry["Early"] = 0, 0, 0
+            
+            processed_data.append(entry)
+            
+    return pd.DataFrame(processed_data)
 
-# --- Sidebar ---
+# --- 6. SIDEBAR & NAVIGATION ---
+if 'final_db' not in st.session_state:
+    st.session_state.final_db = None
+
 with st.sidebar:
-    st.header("Settings")
-    u_file = st.file_uploader("Upload Excel", type=['xlsx'])
-    h_days = st.multiselect("Select Holidays:", range(1, 32))
+    st.markdown("## 🍊 Orange House HR")
     st.markdown("---")
-    report = st.selectbox("Switch View:", ["Muster", "Summary", "Exceptions", "Half-Day", "Penalty", "Correction"])
+    uploaded_file = st.file_uploader("📤 Upload Attendance Excel", type=['xlsx'])
+    sel_hols = st.multiselect("🗓️ Select Holidays:", range(1, 32))
+    
+    st.markdown("---")
+    st.markdown("### 🧭 Navigation")
+    # LOCKED SELECTBOX
+    report_choice = st.selectbox("Switch Report View:", NAV_MENU)
+    st.markdown("---")
+    st.caption("🔒 Navigation Menu is Locked")
 
-# --- Main App ---
-if u_file and st.session_state.hr_master is None:
-    # Row 2 contains headers (1,2,3...)
-    raw = pd.read_excel(u_file, header=1)
-    st.session_state.hr_master = smart_process(raw, h_days)
+# --- 7. MAIN DASHBOARD DISPLAY ---
+st.markdown('<p class="main-title">Orange House Pvt Ltd.</p>', unsafe_allow_html=True)
 
-if st.session_state.hr_master is not None:
-    data = st.session_state.hr_master
-    st.markdown('<p class="header">Orange House Pvt Ltd.</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="title">{report} Report</p>', unsafe_allow_html=True)
+if uploaded_file:
+    if st.session_state.final_db is None:
+        # Load from row 0 based on image
+        raw_df = pd.read_excel(uploaded_file)
+        st.session_state.final_db = process_hr_data(raw_df, sel_hols)
+    
+    db = st.session_state.final_db
+    st.markdown(f'<div class="report-header"><h3>{report_choice}</h3></div>', unsafe_allow_html=True)
 
-    if report == "Muster":
-        st.dataframe(data.pivot(index=["Emp ID", "Name"], columns="Date", values="Status"))
-    elif report == "Summary":
-        summ = data.groupby(["Emp ID", "Name"]).agg(
+    if report_choice == "Attendance Muster (Monthly)":
+        muster = db.pivot(index=["ID", "Name"], columns="Date", values="Status")
+        st.dataframe(muster, use_container_width=True)
+
+    elif report_choice == "Attendance Summary":
+        # Rule: Present, Absent, Leave, Late
+        summary = db.groupby(["ID", "Name"]).agg(
+            Total_Days=('Date', 'nunique'),
             Present=('Status', lambda x: (x == 'P').sum()),
+            Half_Day=('Status', lambda x: (x == 'HD').sum()),
             Absent=('Status', lambda x: (x == 'A').sum()),
-            Late=('Late', 'sum'), Early=('Early', 'sum')
+            Late_Count=('Late', 'sum')
         ).reset_index()
-        st.table(summ)
-    elif report == "Exceptions":
-        st.table(data.groupby(["Emp ID", "Name"]).agg(Miss_Punch=('Miss', 'sum'), Late=('Late', 'sum'), Early=('Early', 'sum')).reset_index())
-    elif report == "Half-Day":
-        st.table(data[data["Status"] == "HD"][["Emp ID", "Name", "Date", "In", "Out"]])
-    elif report == "Correction":
-        miss = data[data["Miss"] == 1]
-        for i, r in miss.iterrows():
-            with st.expander(f"Fix {r['Name']} - Date {r['Date']}"):
-                ni, no = st.text_input("In", "09:30", key=f"i{i}"), st.text_input("Out", "18:30", key=f"o{i}")
-                if st.button("Save", key=f"s{i}"):
-                    st.session_state.hr_master.at[i, 'In'] = datetime.strptime(ni, '%H:%M').time()
-                    st.session_state.hr_master.at[i, 'Out'] = datetime.strptime(no, '%H:%M').time()
-                    st.rerun()
+        st.table(summary)
+
+    elif report_choice == "Exception Report":
+        # Rule: Late, Early Out, Miss Punch
+        excep = db.groupby(["ID", "Name"]).agg(
+            Late_In=('Late', 'sum'),
+            Early_Out=('Early', 'sum'),
+            Miss_Punch=('Miss', 'sum'),
+            Absents=('Status', lambda x: (x == 'A').sum())
+        ).reset_index()
+        st.table(excep)
+
+    elif report_choice == "Half Day Report":
+        st.table(db[db["Status"] == "HD"][["ID", "Name", "Date", "In", "Out", "Dur"]])
+
+    elif report_choice == "Late Penalty Report":
+        st.table(db.groupby(["ID", "Name"]).agg(Late_Days=('Late', 'sum')).reset_index())
+
+    elif report_choice == "Continuous Absenteeism":
+        # Filter for employees with more than 3 absents
+        cont_abs = db[db["Status"] == "A"].groupby(["ID", "Name"]).size().reset_index(name='Total_Absents')
+        st.table(cont_abs[cont_abs['Total_Absents'] >= 3])
+
 else:
-    st.info("Sidebar se Excel file upload karein.")
+    st.info("👋 Hello! Please upload the Monthly Attendance Excel file in the sidebar.")
