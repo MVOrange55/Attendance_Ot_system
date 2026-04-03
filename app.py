@@ -29,31 +29,39 @@ def get_ot_decimal_slab(total_hours):
     return float(hours + slab_dec)
 
 def process_data(df, holiday_dates):
-    # Header cleaning: Sirf wahi columns le jo 1-31 ke beech hain
+    # Sabse pehle headers ko clean karein
+    df.columns = [str(c).strip().split('.')[0] for c in df.columns]
     cols = df.columns.tolist()
-    emp_id_col, name_col = cols[0], cols[1]
+    
+    emp_id_col = cols[0]
+    name_col = cols[1]
+    
     df[emp_id_col] = df[emp_id_col].ffill()
     df[name_col] = df[name_col].ffill()
     
-    # Strictly filter only date columns (1 to 31)
+    # Strictly filter columns that are numbers between 1-31
     date_cols = []
     for c in cols:
-        try:
-            val = int(float(str(c).split('.')[0]))
+        if c.isdigit():
+            val = int(c)
             if 1 <= val <= 31:
                 date_cols.append(c)
-        except: continue
+
+    if not date_cols:
+        st.error("Excel mein Dates (1, 2, 3...) nahi mili. Header row check karein.")
+        return pd.DataFrame()
 
     master_records = []
     for eid in df[emp_id_col].unique():
-        if pd.isna(eid): continue
+        if pd.isna(eid) or str(eid).lower() == 'emp id': continue
         emp_block = df[df[emp_id_col] == eid].reset_index(drop=True)
         if len(emp_block) < 4: continue
+        
         emp_name = emp_block.iloc[0][name_col]
         sl_count = 0 
 
         for day in date_cols:
-            day_label = int(float(str(day).split('.')[0]))
+            day_label = int(day)
             status_val = str(emp_block.iloc[0][day]).strip().upper()
             in_t, out_t = parse_t(emp_block.iloc[1][day]), parse_t(emp_block.iloc[2][day])
             total_val = emp_block.iloc[3][day]
@@ -70,20 +78,18 @@ def process_data(df, holiday_dates):
 
             if (in_t and not out_t) or (not in_t and out_t):
                 res["Is_Miss"] = True
+                res["Display"] = "A"
             elif in_t and out_t:
-                # Late/Early Rules
                 if in_t > time(9, 35):
                     res["Late_Min"] = int((datetime.combine(datetime.today(), in_t) - datetime.combine(datetime.today(), time(9, 30))).total_seconds() / 60)
                 if duration < 8.5 and not is_off:
                     res["Early_Min"] = int((8.5 - duration) * 60)
                 
-                # OT Calculation
                 if is_off: raw_ot = duration
                 elif in_t >= time(10, 16): raw_ot = max(0, duration - 4.0)
                 else: raw_ot = max(0, duration - 8.5)
                 res["OT_Dec"] = get_ot_decimal_slab(raw_ot)
 
-                # Status
                 if is_off: res["Display"] = status_val if status_val else "W"
                 elif in_t >= time(10, 16): res["Display"] = "AB/"
                 elif 5.8 <= duration <= 6.2 and sl_count < 1:
@@ -99,30 +105,29 @@ def process_data(df, holiday_dates):
 
 # --- UI ---
 st.sidebar.header("Settings")
-h_days = st.sidebar.multiselect("Holidays:", range(1, 32))
+h_days = st.sidebar.multiselect("Select Holidays:", range(1, 32))
 u_file = st.file_uploader("Upload Excel", type=['xlsx'])
 
 if u_file:
-    # Header=1 kyunki aapki file mein 2nd row se data shuru hota hai
-    df_in = pd.read_excel(u_file, header=1)
-    final_df = process_data(df_in, h_days)
-    
-    if not final_df.empty:
-        t = st.tabs(["📋 Attendance", "💰 OT (Decimal)", "⚠️ Miss Punch", "🕒 Late/Early"])
+    # Multiple Header try karega agar pehli bar me na mile
+    try:
+        df_in = pd.read_excel(u_file, header=1)
+        final_df = process_data(df_in, h_days)
         
-        with t[0]:
-            st.dataframe(final_df.pivot(index=["Emp ID", "Name"], columns="Date", values="Display"))
+        if not final_df.empty:
+            t = st.tabs(["📋 Attendance", "💰 OT (Decimal)", "⚠️ Miss Punch", "🕒 Late/Early"])
             
-        with t[1]:
-            ot_p = final_df.pivot(index=["Emp ID", "Name"], columns="Date", values="OT_Dec")
-            # Calculate Total correctly row-wise
-            ot_p["Monthly Total"] = ot_p.sum(axis=1)
-            st.dataframe(ot_p.style.format("{:.2f}"))
+            with t[0]:
+                st.dataframe(final_df.pivot(index=["Emp ID", "Name"], columns="Date", values="Display"))
+            with t[1]:
+                ot_p = final_df.pivot(index=["Emp ID", "Name"], columns="Date", values="OT_Dec")
+                ot_p["Total"] = ot_p.sum(axis=1)
+                st.dataframe(ot_p.style.format("{:.2f}"))
+            with t[2]:
+                st.dataframe(final_df[final_df["Is_Miss"]==True][["Emp ID", "Name", "Date", "In", "Out"]])
+            with t[3]:
+                st.dataframe(final_df[(final_df["Late_Min"] > 5) | (final_df["Early_Min"] > 0)])
             
-        with t[2]:
-            st.dataframe(final_df[final_df["Is_Miss"]==True][["Emp ID", "Name", "Date", "In", "Out"]])
-            
-        with t[3]:
-            st.dataframe(final_df[(final_df["Late_Min"] > 5) | (final_df["Early_Min"] > 0)])
-
-    st.sidebar.download_button("📥 Download", final_df.to_csv(index=False).encode('utf-8'), "HR_Report.csv")
+            st.sidebar.download_button("📥 Download", final_df.to_csv(index=False).encode('utf-8'), "Report.csv")
+    except Exception as e:
+        st.error(f"Error: {e}. Excel sheet ka format check karein.")
