@@ -2,18 +2,17 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
 
-st.set_page_config(page_title="Orange House HR Automation", layout="wide")
+st.set_page_config(page_title="Orange House HR System", layout="wide")
 
-# Custom CSS for Professional Look
+# --- Custom Styles ---
 st.markdown("""
     <style>
     .report-header { font-size: 24px; font-weight: bold; text-align: center; color: #d35400; margin-bottom: 0px; }
     .report-title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; text-decoration: underline; }
-    [data-testid="stSidebarNav"] {display: none;}
     </style>
     """, unsafe_allow_html=True)
 
-# Helper: Time Parsing
+# --- Helper Functions ---
 def parse_t(val):
     if pd.isna(val) or str(val).strip() == '' or str(val).lower() == 'nan': return None
     try:
@@ -24,7 +23,6 @@ def parse_t(val):
         return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
     except: return None
 
-# Helper: OT Calculation
 def get_ot_decimal(total_hrs):
     h = int(total_hrs); m = round((total_hrs - h) * 60)
     if m < 15: dec = 0.0
@@ -37,10 +35,11 @@ def get_ot_decimal(total_hrs):
 if 'master_data' not in st.session_state:
     st.session_state.master_data = None
 
-# Core Engine: Data Processing
+# --- Core Data Processor ---
 def process_data(df, holidays):
     df.columns = [str(c).strip().split('.')[0] for c in df.columns]
     cols = df.columns.tolist()
+    # Flexible column detection
     eid_col, name_col = cols[0], cols[1]
     
     df[eid_col] = df[eid_col].ffill()
@@ -68,74 +67,81 @@ def process_data(df, holidays):
             })
     return pd.DataFrame(results)
 
-# Sidebar UI
+# --- Sidebar UI ---
 with st.sidebar:
-    st.title("🍊 Admin Panel")
-    u_file = st.file_uploader("Upload Excel", type=['xlsx'])
-    h_days = st.multiselect("Select Holidays:", range(1, 32))
+    st.title("⚙️ Admin Settings")
+    u_file = st.file_uploader("Upload Monthly Excel", type=['xlsx'])
+    h_days = st.multiselect("Select Holidays (Dates):", range(1, 32))
     st.markdown("---")
-    page = st.radio("Navigation:", [
+    page = st.selectbox("Select Report:", [
         "Muster Report", "Attendance Summary", "Exception Report", 
-        "OT Report", "Half Day Report", "Late Penalty", "Edit Miss Punch"
+        "Half Day Report", "Continuous Absenteeism", "Late Penalty", 
+        "OT (Decimal) Report", "Edit Miss Punch"
     ])
 
+# --- Main Logic ---
 if u_file and st.session_state.master_data is None:
-    raw = pd.read_excel(u_file, header=1)
-    st.session_state.master_data = process_data(raw, h_days)
+    raw_df = pd.read_excel(u_file, header=1)
+    st.session_state.master_data = process_data(raw_df, h_days)
 
 if st.session_state.master_data is not None:
-    df_data = st.session_state.master_data.copy()
+    df = st.session_state.master_data.copy()
     
-    def apply_logic(row):
+    def apply_rules(row):
         in_t, out_t, dur = row['In'], row['Out'], row['Duration']
         res = {"Final_Status": "A", "Late": 0, "Early": 0, "OT": 0.0, "Is_Miss": False, "Half_Day": False}
-        
         if (in_t and not out_t) or (not in_t and out_t): res["Is_Miss"] = True
         elif in_t and out_t:
             if in_t > time(9, 35): res["Late"] = 1
             if dur < 8.5 and not row['Is_Holiday']: res["Early"] = 1
-            if 3.5 <= dur <= 5.5: res["Half_Day"] = True; res["Final_Status"] = "HD"
+            if 3.5 <= dur <= 5.0: res["Half_Day"] = True; res["Final_Status"] = "HD"
             elif row['Is_Holiday']: res["Final_Status"] = row['Status'] if row['Status'] else "WO"
             elif in_t >= time(10, 16): res["Final_Status"] = "AB/"
             else: res["Final_Status"] = "P"
-            
             raw_ot = dur if row['Is_Holiday'] else (max(0, dur - 4.0) if in_t >= time(10, 16) else max(0, dur - 8.5))
             res["OT"] = get_ot_decimal(raw_ot)
         else: res["Final_Status"] = row['Status'] if row['Is_Holiday'] else "A"
         return pd.Series(res)
 
-    f_df = pd.concat([df_data, df_data.apply(apply_logic, axis=1)], axis=1)
+    f_df = pd.concat([df, df.apply(apply_rules, axis=1)], axis=1)
 
-    def show_header(title):
-        st.markdown('<p class="report-header">Orange House Pvt Ltd.</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="report-title">{title}</p>', unsafe_allow_html=True)
+    def header(t):
+        st.markdown(f'<p class="report-header">Orange House Pvt Ltd.</p><p class="report-title">{t}</p>', unsafe_allow_html=True)
 
     if page == "Muster Report":
-        show_header("Attendance Muster Report (Monthly)")
+        header("Attendance Muster Report (Monthly)")
         st.dataframe(f_df.pivot(index=["Emp ID", "Name"], columns="Date", values="Final_Status"))
 
     elif page == "Attendance Summary":
-        show_header("Attendance Summary")
+        header("Attendance Summary")
         summary = f_df.groupby(["Emp ID", "Name"]).agg(
-            Working_Days=('Final_Status', lambda x: (x=='P').sum() + (x=='HD').sum()*0.5),
-            Present=('Final_Status', lambda x: (x=='P').sum()),
-            Absent=('Final_Status', lambda x: (x=='A').sum()),
+            Working_Days=('Final_Status', lambda x: (x == 'P').sum() + (x == 'HD').sum()*0.5),
+            Present=('Final_Status', lambda x: (x == 'P').sum()),
+            Absent=('Final_Status', lambda x: (x == 'A').sum()),
             Late=('Late', 'sum'), Early_Out=('Early', 'sum')
         ).reset_index()
         st.table(summary)
 
-    elif page == "OT Report":
-        show_header("Monthly OT Report (Decimal)")
-        ot_table = f_df.pivot(index=["Emp ID", "Name"], columns="Date", values="OT")
-        ot_table["Total"] = ot_table.sum(axis=1)
-        st.dataframe(ot_table.style.format("{:.2f}"))
+    elif page == "Exception Report":
+        header("Exception Report")
+        excep = f_df.groupby(["Emp ID", "Name"]).agg(Late=('Late', 'sum'), Early_Out=('Early', 'sum'), Miss_Punch=('Is_Miss', 'sum'), Absents=('Final_Status', lambda x: (x == 'A').sum())).reset_index()
+        st.table(excep)
+
+    elif page == "Half Day Report":
+        header("Half Day Report")
+        st.table(f_df[f_df["Half_Day"] == True][["Emp ID", "Name", "Date", "In", "Out"]])
+
+    elif page == "OT (Decimal) Report":
+        header("Monthly OT Report (Slabs)")
+        ot_p = f_df.pivot(index=["Emp ID", "Name"], columns="Date", values="OT")
+        ot_p["Total"] = ot_p.sum(axis=1)
+        st.dataframe(ot_p.style.format("{:.2f}"))
 
     elif page == "Edit Miss Punch":
-        show_header("Correction Panel")
+        header("Correction Panel")
         miss = f_df[f_df["Is_Miss"] == True]
-        if miss.empty: st.success("No Miss Punches found!")
         for idx, r in miss.iterrows():
-            with st.expander(f"Fix: {r['Name']} (Date {r['Date']})"):
+            with st.expander(f"Fix {r['Name']} - Date {r['Date']}"):
                 c1, c2 = st.columns(2)
                 ni = c1.text_input("In", "09:30", key=f"i{idx}")
                 no = c2.text_input("Out", "18:30", key=f"o{idx}")
@@ -143,7 +149,5 @@ if st.session_state.master_data is not None:
                     st.session_state.master_data.at[idx, 'In'] = datetime.strptime(ni, '%H:%M').time()
                     st.session_state.master_data.at[idx, 'Out'] = datetime.strptime(no, '%H:%M').time()
                     st.rerun()
-    else:
-        show_header(page)
-        st.write("Report logic applied. Data loading...")
-        st.dataframe(f_df)
+else:
+    st.info("👈 Please upload the file in the sidebar.")
