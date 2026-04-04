@@ -1,139 +1,98 @@
 import streamlit as st
 import pandas as pd
+import re
 
-# 1. Page Configuration
-st.set_page_config(layout="wide", page_title="HR Premium Dashboard")
+# 1. Page Config
+st.set_page_config(layout="wide", page_title="Orange HR Dashboard")
 
-# 2. Custom CSS for Premium Look (No Dots, No Numbers in Nav)
+# 2. Premium CSS (No Dots, No Numbers, Clean Nav)
 st.markdown("""
     <style>
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background-color: #2c3e50;
-        min-width: 300px;
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
-    /* Hide Radio Buttons (Dots) to make it a clean list */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
-        display: none !important;
-    }
+    [data-testid="stSidebar"] { background-color: #2c3e50; min-width: 300px; }
+    [data-testid="stSidebar"] * { color: white !important; }
+    /* Navigation cleanup: Hide dots/radio buttons */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] label {
-        padding: 12px 20px;
-        border-radius: 8px;
-        margin-bottom: 8px;
-        transition: 0.3s ease;
-        background: rgba(255,255,255,0.05);
-        cursor: pointer;
+        padding: 12px 20px; border-radius: 8px; margin-bottom: 8px;
+        transition: 0.3s; background: rgba(255,255,255,0.05); cursor: pointer;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-        background: #e67e22;
-        transform: translateX(5px);
-    }
-    /* Login Button Styling */
-    div.stButton > button:first-child {
-        background-color: #e67e22;
-        color: white;
-        border-radius: 10px;
-        width: 100%;
-        height: 50px;
-        font-weight: bold;
-    }
-    /* Input Field Styling */
-    .stTextInput input {
-        border-radius: 10px !important;
-    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: #e67e22; }
+    .stButton > button { background-color: #e67e22; color: white; border-radius: 10px; width: 100%; font-weight: bold; }
+    
+    /* Table Styling */
+    .status-pass { color: #27ae60; font-weight: bold; }
+    .status-fail { color: #e74c3c; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Session State for Login Tracking
+# 3. Login Session Logic
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
-# --- LOGIN PAGE LOGIC ---
+# --- LOGIN PAGE ---
 if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center; color: #e67e22; margin-top: 50px;'>🔐 HR System Login</h1>", unsafe_allow_html=True)
-    
+    st.markdown("<h1 style='text-align: center; color: #e67e22;'>🔐 Orange HR Login</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.write("---")
-        # Inputs without placeholders
-        u_name = st.text_input("Username", value="", placeholder="")
-        p_name = st.text_input("Password", type="password", value="", placeholder="")
+        # Username aur Password column mein show nahi ho rahe (Stacked/Rows mein hain)
+        # Placeholder khali hai (Blank boxes)
+        u_val = st.text_input("Username", value="", placeholder="")
+        p_val = st.text_input("Password", type="password", value="", placeholder="")
         
-        if st.button("LOGIN TO DASHBOARD"):
-            if u_name == "Orange_Hr" and p_name == "Orange_Admin":
+        if st.button("LOGIN"):
+            if u_val == "Orange_Hr" and p_val == "Orange_Admin":
                 st.session_state['logged_in'] = True
+                st.session_state['user'] = u_val
+                st.session_state['pass'] = p_val
                 st.rerun()
             else:
-                st.error("Invalid Username or Password. Please try again!")
-    st.markdown("<p style='text-align: center; color: grey;'>Fields are blank for security.</p>", unsafe_allow_html=True)
+                st.error("Invalid Credentials!")
 
-# --- PROTECTED DASHBOARD PAGE ---
+# --- DASHBOARD (After Login) ---
 else:
-    # Sidebar Navigation - Removed Numbers and Dots
-    st.sidebar.markdown("## 🧭 Navigation")
-    
+    # Sidebar Navigation (Numbers aur Dots hata diye hain)
+    st.sidebar.title("Navigation")
     reports_list = [
-        "Attendance Muster",
-        "Overtime Report",
-        "Exception Summary",
-        "Exception Detailed",
-        "Miss Punch Tracker",
-        "Half Day Report",
-        "Absenteeism Report",
-        "Attendance Summary",
-        "Correction Module",
-        "Holiday Settings",
-        "Upload Attendance File"
+        "Attendance Muster", "Overtime Report", "Exception Summary",
+        "Exception Detailed", "Miss Punch Tracker", "Half Day Report",
+        "Absenteeism Report", "Attendance Summary", "Correction Module",
+        "Holiday Settings", "Upload File"
     ]
-    
     choice = st.sidebar.radio("", reports_list)
 
-    # Logout functionality
-    st.sidebar.write("---")
-    if st.sidebar.button("🚪 Logout"):
+    if st.sidebar.button("Logout"):
         st.session_state['logged_in'] = False
         st.rerun()
 
-    # Main Display Area
     st.title(f"📊 {choice}")
-    st.write(f"Current System Date: 4th April, 2026")
+    st.write("---")
 
-    # --- 1. UPLOAD FILE MODULE ---
-    if choice == "Upload Attendance File":
-        st.subheader("📁 Upload Data for Processing")
-        up_file = st.file_uploader("Select Excel File (.xlsx)", type=['xlsx'])
-        if up_file:
-            data_df = pd.read_excel(up_file)
-            st.success("File Processed Successfully!")
-            st.dataframe(data_df, use_container_width=True)
+    # --- THE 9 ORIGINAL RULES (Pahle Jese) ---
+    st.subheader(f"Validation Analysis for: {choice}")
+    
+    user = st.session_state['user']
+    pwd = st.session_state['pass']
 
-    # --- 2. HOLIDAY SETTINGS MODULE ---
+    # Wahi 9 Reports/Rules jo aapne banwayi thi:
+    rules_data = [
+        {"ID": 1, "Report Rule": "Empty Username Check", "Status": "PASSED" if user else "FAILED", "Remark": "Field is filled"},
+        {"ID": 2, "Report Rule": "Empty Password Check", "Status": "PASSED" if pwd else "FAILED", "Remark": "Field is filled"},
+        {"ID": 3, "Report Rule": "Minimum Length (8)", "Status": "PASSED" if len(pwd)>=8 else "FAILED", "Remark": "Security requirement"},
+        {"ID": 4, "Report Rule": "Maximum Length (20)", "Status": "PASSED" if len(pwd)<=20 else "FAILED", "Remark": "Char limit check"},
+        {"ID": 5, "Report Rule": "No Space Check", "Status": "PASSED" if " " not in user else "FAILED", "Remark": "Username format"},
+        {"ID": 6, "Report Rule": "Special Character Check", "Status": "PASSED" if re.search(r"[!@#$%^&*]", pwd) else "FAILED", "Remark": "Complexity check"},
+        {"ID": 7, "Report Rule": "Numeric Value Check", "Status": "PASSED" if re.search(r"\d", pwd) else "FAILED", "Remark": "Contains digits"},
+        {"ID": 8, "Report Rule": "Admin Name Restriction", "Status": "PASSED" if user.lower() != "admin" else "FAILED", "Remark": "Role security"},
+        {"ID": 9, "Report Rule": "User ID Min Length (4)", "Status": "PASSED" if len(user)>=4 else "FAILED", "Remark": "ID verification"}
+    ]
+
+    # Displaying as a professional table
+    df_rules = pd.DataFrame(rules_data)
+    st.table(df_rules)
+
+    # Extra features niche
+    if choice == "Upload File":
+        st.file_uploader("Upload Excel", type=['xlsx'])
     elif choice == "Holiday Settings":
-        st.subheader("📅 Configure Calendar Holidays")
-        h_date = st.date_input("Select Date")
-        h_desc = st.text_input("Reason / Holiday Name")
-        if st.button("Add to Holiday List"):
-            st.success(f"Holiday '{h_desc}' saved for {h_date}")
-
-    # --- 3. ALL 9 REPORTS DATA ---
-    else:
-        st.markdown(f"### Generating {choice}...")
-        # Showing a sample table for the reports
-        st.write("Recent Records Found:")
-        sample_report = pd.DataFrame({
-            "Emp ID": ["1001", "1002", "1003", "1004"],
-            "Employee Name": ["Rahul Sharma", "Sonia Verma", "Amit Kumar", "Priya Das"],
-            "Department": ["IT", "HR", "Sales", "Finance"],
-            "Status": ["Present", "Correction Required", "On Leave", "Half Day"]
-        })
-        st.table(sample_report)
-        
-        st.download_button(
-            label=f"Download {choice} Excel",
-            data="Sample Data",
-            file_name=f"{choice.replace(' ', '_')}.csv",
-            mime="text/csv"
-        )
+        st.date_input("Set Holiday")
+        st.text_input("Holiday Name", placeholder="")
