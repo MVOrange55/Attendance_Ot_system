@@ -3,124 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>9-Rule Validation Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Attendance Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root { --primary: #e67e22; --dark: #2c3e50; --light: #f4f7f6; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-        body { background: #f0f2f5; display: flex; min-height: 100vh; }
+        body { background: var(--light); display: flex; }
 
-        /* --- Stylish Sidebar --- */
-        .sidebar { width: 260px; background: #1a1a2e; color: white; position: fixed; height: 100vh; padding: 25px; }
-        .sidebar h2 { color: #00d2ff; font-size: 22px; margin-bottom: 35px; text-transform: uppercase; letter-spacing: 2px; }
+        /* --- 1. Attractive Navigation (Sidebar) --- */
+        .sidebar { width: 280px; height: 100vh; background: var(--dark); color: white; position: fixed; padding: 20px; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
+        .sidebar h2 { color: var(--primary); font-size: 24px; margin-bottom: 30px; border-bottom: 1px solid #34495e; padding-bottom: 10px; }
         .nav-links { list-style: none; }
-        .nav-links li { padding: 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 12px; color: #adb5bd; }
-        .nav-links li:hover, .nav-links li.active { background: #00d2ff; color: #1a1a2e; font-weight: 600; }
+        .nav-links li { padding: 12px 15px; margin-bottom: 5px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 14px; color: #bdc3c7; display: flex; align-items: center; gap: 10px; }
+        .nav-links li:hover { background: var(--primary); color: white; }
+        .nav-links li.active { background: var(--primary); color: white; font-weight: 500; }
 
-        /* --- Main Layout --- */
-        .main-content { margin-left: 260px; width: 100%; padding: 40px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        /* --- 2. Main Content --- */
+        .main-content { margin-left: 280px; width: 100%; padding: 40px; }
+        .header { margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
 
-        /* --- Modern Login Card (Blank Fields) --- */
-        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin-bottom: 30px; }
-        .input-group { position: relative; margin-bottom: 20px; }
-        .input-group input { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; outline: none; font-size: 15px; transition: 0.3s; }
-        .input-group label { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; pointer-events: none; transition: 0.3s; background: #fff; padding: 0 5px; }
-        .input-group input:focus ~ label, .input-group input:valid ~ label { top: 0; font-size: 12px; color: #00d2ff; font-weight: 600; }
-        .input-group input:focus { border-color: #00d2ff; }
-        .btn { width: 100%; padding: 12px; background: #00d2ff; color: #1a1a2e; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; }
-        .btn:hover { background: #00b8e6; transform: translateY(-2px); }
+        /* --- 3. Clean Login Section (No Placeholders) --- */
+        .login-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); max-width: 400px; margin-bottom: 40px; }
+        .input-group { position: relative; margin-bottom: 25px; }
+        .input-group input { width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 8px; outline: none; font-size: 16px; background: transparent; }
+        .input-group label { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; transition: 0.3s; background: #fff; padding: 0 5px; }
+        /* Floating Label Logic */
+        .input-group input:focus ~ label, .input-group input:valid ~ label { top: 0; font-size: 12px; color: var(--primary); font-weight: 600; }
+        .input-group input:focus { border-color: var(--primary); }
+        .btn-login { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; }
 
-        /* --- 9-Rule Report Table --- */
-        .report-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-        th { background: #f8f9fa; color: #333; font-weight: 600; }
-        .pass { color: #27ae60; font-weight: 600; }
-        .fail { color: #e74c3c; font-weight: 600; }
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; text-transform: uppercase; }
+        /* --- 4. Report Display Table --- */
+        .report-view { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #fafafa; color: #666; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <h2><i class="fas fa-shield-alt"></i> SafeGuard</h2>
+        <h2><i class="fas fa-calendar-check"></i> Navigation</h2>
         <ul class="nav-links">
-            <li class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
-            <li><i class="fas fa-file-invoice"></i> All 9 Reports</li>
-            <li><i class="fas fa-user-shield"></i> Security Check</li>
-            <li><i class="fas fa-cog"></i> Settings</li>
+            <li class="active">1. Attendance Muster</li>
+            <li>2. Overtime Report</li>
+            <li>3. Exception Summary</li>
+            <li>4. Exception Detailed</li>
+            <li>5. Miss Punch Tracker</li>
+            <li>6. Half Day Report</li>
+            <li>7. Absenteeism Report</li>
+            <li>8. Attendance Summary</li>
+            <li>9. Correction Module</li>
         </ul>
     </div>
 
     <div class="main-content">
         <div class="header">
-            <h1>System Security Console</h1>
-            <span id="currentTime">April 4, 2026</span>
+            <h1>Report Dashboard</h1>
+            <div class="user"><i class="fas fa-user-circle"></i> Admin</div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom: 15px;">User Validation</h3>
+        <div class="login-card">
+            <h3 style="margin-bottom:20px;">System Login</h3>
             <div class="input-group">
-                <input type="text" id="username" required>
+                <input type="text" required>
                 <label>Username</label>
             </div>
             <div class="input-group">
-                <input type="password" id="password" required>
+                <input type="password" required>
                 <label>Password</label>
             </div>
-            <button class="btn" onclick="runAll9Reports()">Run All 9 Reports</button>
+            <button class="btn-login">View Report</button>
         </div>
 
-        <div class="report-card" id="reportArea" style="display:none;">
-            <h3>Full Validation Report (9 Rules)</h3>
+        <div class="report-view">
+            <h3>Active Report Data</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Security Rule Description</th>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Report Type</th>
                         <th>Status</th>
-                        <th>Verdict</th>
                     </tr>
                 </thead>
-                <tbody id="resultBody"></tbody>
+                <tbody>
+                    <tr>
+                        <td>EMP_101</td>
+                        <td>Rahul Singh</td>
+                        <td>Attendance Muster</td>
+                        <td style="color: green; font-weight: 600;">Present</td>
+                    </tr>
+                    <tr>
+                        <td>EMP_102</td>
+                        <td>Sonia Verma</td>
+                        <td>Miss Punch</td>
+                        <td style="color: red; font-weight: 600;">Correction Required</td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     </div>
 
-    <script>
-        function runAll9Reports() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const body = document.getElementById('resultBody');
-            document.getElementById('reportArea').style.display = 'block';
-            body.innerHTML = "";
-
-            const rules = [
-                { id: 1, name: "Empty Username Check", check: u !== "" },
-                { id: 2, name: "Empty Password Check", check: p !== "" },
-                { id: 3, name: "Min Password Length (8)", check: p.length >= 8 },
-                { id: 4, name: "Max Password Length (20)", check: p.length <= 20 },
-                { id: 5, name: "Username No Spaces", check: !u.includes(" ") },
-                { id: 6, name: "Password Special Char", check: /[!@#$%^&*]/.test(p) },
-                { id: 7, name: "Password Number Check", check: /\d/.test(p) },
-                { id: 8, name: "Admin Restriction", check: u.toLowerCase() !== "admin" },
-                { id: 9, name: "Username Length (Min 4)", check: u.length >= 4 }
-            ];
-
-            rules.forEach(r => {
-                let statusClass = r.check ? "pass" : "fail";
-                let statusText = r.check ? "PASSED" : "FAILED";
-                let verdict = r.check ? "Secure" : "Action Required";
-                
-                body.innerHTML += `<tr>
-                    <td>${r.id}</td>
-                    <td>${r.name}</td>
-                    <td class="${statusClass}">${statusText}</td>
-                    <td><span class="badge" style="background:${r.check ? '#d4edda':'#f8d7da'}">${verdict}</span></td>
-                </tr>`;
-            });
-        }
-    </script>
 </body>
 </html>
