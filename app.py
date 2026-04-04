@@ -1,121 +1,166 @@
 import streamlit as st
 import pandas as pd
-import re
+from datetime import datetime, time, timedelta
+import io
 
-# 1. Page Config
-st.set_page_config(layout="wide", page_title="Orange HR System")
+# --- 1. CONFIGURATION & LOGIN SECURITY ---
+st.set_page_config(page_title="Orange House HR Master System", layout="wide")
 
-# 2. Premium CSS (Navigation dots hataye, clean list banayi)
-st.markdown("""
-    <style>
-    [data-testid="stSidebar"] { background-color: #2c3e50; min-width: 300px; }
-    [data-testid="stSidebar"] * { color: white !important; }
-    /* Navigation cleanup: Hide radio dots */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] label {
-        padding: 12px 20px; border-radius: 8px; margin-bottom: 8px;
-        transition: 0.3s; background: rgba(255,255,255,0.05); cursor: pointer;
-    }
-    [data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: #e67e22; }
-    .stButton > button { background-color: #e67e22; color: white; border-radius: 12px; width: 100%; font-weight: bold; height: 45px; }
-    </style>
-    """, unsafe_allow_html=True)
+VALID_USERNAME = "Orange_HR"
+VALID_PASSWORD = "Orange_Admin"
 
-# 3. Session State Initialization (Error se bachne ke liye)
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
-if 'u_name' not in st.session_state:
-    st.session_state['u_name'] = ""
-if 'p_name' not in st.session_state:
-    st.session_state['p_name'] = ""
+def check_login():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
 
-# --- LOGIN PAGE ---
-if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center; color: #e67e22;'>🔐 Orange HR Login</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        # Blank fields
-        u_input = st.text_input("Username", value="", placeholder="")
-        p_input = st.text_input("Password", type="password", value="", placeholder="")
-        if st.button("LOGIN"):
-            if u_input == "Orange_Hr" and p_input == "Orange_Admin":
-                st.session_state['logged_in'] = True
-                st.session_state['u_name'] = u_input
-                st.session_state['p_name'] = p_input
-                st.rerun()
-            else:
-                st.error("Galt User ya Password!")
+    if not st.session_state["authenticated"]:
+        st.markdown("<h2 style='text-align: center; color: #d35400;'>🍊 Orange House HR Login</h2>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            user = st.text_input("यूजरनेम (Username):")
+            pwd = st.text_input("पासवर्ड (Password):", type="password")
+            if st.button("Login"):
+                if user == VALID_USERNAME and pwd == VALID_PASSWORD:
+                    st.session_state["authenticated"] = True
+                    st.rerun()
+                else:
+                    st.error("गलत यूजरनेम या पासवर्ड! कृपया सही क्रेडेंशियल डालें।")
+        return False
+    return True
 
-# --- DASHBOARD (Sirf Login ke baad dikhega) ---
-else:
-    # Sidebar Navigation (Wahi 9 Reports jo aapne batayi thi)
-    st.sidebar.title("Navigation")
-    menu = [
-        "Attendance Muster", "Overtime Report", "Exception Summary",
-        "Exception Detailed", "Miss Punch Tracker", "Half Day Report",
-        "Absenteeism Report", "Attendance Summary", "Correction Module",
-        "Holiday Settings", "Upload Excel Data"
-    ]
-    choice = st.sidebar.radio("", menu)
+# --- 2. CORE UTILITIES ---
+def parse_t(val):
+    if pd.isna(val) or str(val).strip() in ['', 'nan', '00:00']: return None
+    try: return datetime.strptime(str(val).strip(), '%H:%M').time()
+    except: return None
 
-    if st.sidebar.button("🚪 Logout"):
-        st.session_state.clear() # Poora session saaf
-        st.rerun()
+def get_excel_download(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
 
-    st.title(f"📊 {choice}")
-    st.divider()
-
-    # --- 9 VALIDATION RULES (HAR REPORT MEIN DIKHEGA) ---
-    st.subheader("🛡️ Security & Validation Report")
-    u = st.session_state['u_name']
-    p = st.session_state['p_name']
+# --- 3. MASTER CALCULATION ENGINE (ALL RULES) ---
+def process_hr_system(df, nh_list):
+    df.columns = [str(c).strip() for c in df.columns]
+    id_col, name_col = df.columns[0], df.columns[1]
+    df[id_col] = df[id_col].ffill()
+    df[name_col] = df[name_col].ffill()
+    dates = [c for c in df.columns if c.isdigit()]
     
-    rules = [
-        {"ID": 1, "Rule": "Empty User Check", "Status": "✅ PASS" if u else "❌ FAIL"},
-        {"ID": 2, "Rule": "Empty Pass Check", "Status": "✅ PASS" if p else "❌ FAIL"},
-        {"ID": 3, "Rule": "Min Length (8)", "Status": "✅ PASS" if len(p)>=8 else "❌ FAIL"},
-        {"ID": 4, "Rule": "Max Length (20)", "Status": "✅ PASS" if len(p)<=20 else "❌ FAIL"},
-        {"ID": 5, "Rule": "No Space in User", "Status": "✅ PASS" if " " not in u else "❌ FAIL"},
-        {"ID": 6, "Rule": "Special Char Check", "Status": "✅ PASS" if re.search(r"[!@#$%^&*]", p) else "❌ FAIL"},
-        {"ID": 7, "Rule": "Numeric Check", "Status": "✅ PASS" if re.search(r"\d", p) else "❌ FAIL"},
-        {"ID": 8, "Rule": "Admin Restricted", "Status": "✅ PASS" if u.lower() != "admin" else "❌ FAIL"},
-        {"ID": 9, "Rule": "User ID Min Length", "Status": "✅ PASS" if len(u)>=4 else "❌ FAIL"}
-    ]
-    st.table(pd.DataFrame(rules))
-    st.divider()
+    muster, ot_rep, ex_sum, ex_det, miss_p = [], [], [], [], []
 
-    # --- ACTUAL REPORT CONTENT ---
-    if choice == "Attendance Muster":
-        st.write("### 📅 Monthly Attendance Record")
-        st.dataframe(pd.DataFrame({
-            "Emp ID": ["1001", "1002", "1003"],
-            "Name": ["Rahul Sharma", "Sonia Verma", "Amit Kumar"],
-            "In-Time": ["09:00", "09:15", "08:50"],
-            "Out-Time": ["18:00", "18:05", "18:15"],
-            "Status": ["P", "P", "P"]
-        }), use_container_width=True)
+    for eid in df[id_col].unique():
+        if pd.isna(eid): continue
+        block = df[df[id_col] == eid].reset_index(drop=True)
+        ename, emp_id = block.iloc[0][name_col], str(int(float(eid)))
+        
+        row_m, row_ot = {"Emp ID": emp_id, "Name": ename}, {"Emp ID": emp_id, "Name": ename}
+        l_cnt, e_cnt, ab_cnt, a_cnt, p_cnt = 0, 0, 0, 0, 0
+        l_dt_tm, e_dt_tm, ab_dates = [], [], []
+        sl_used_date = "--"
 
-    elif choice == "Overtime Report":
-        st.write("### 🕒 OT Calculation")
-        st.table(pd.DataFrame({
-            "Name": ["Rahul Sharma", "Amit Kumar"],
-            "Total Hrs": ["10:00", "09:30"],
-            "OT Hrs": ["01:30", "01:00"]
-        }))
+        for d in dates:
+            t_in_raw = parse_t(block.iloc[1][d])
+            t_out = parse_t(block.iloc[2][d])
+            
+            # 1. Miss Punch Rule (Single Punch Missing)
+            if (t_in_raw and not t_out):
+                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In": t_in_raw.strftime('%H:%M'), "Out": "--:--", "Status": "Out Missing"})
+                row_m[d] = "Miss"; continue
+            if (not t_in_raw and t_out):
+                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In": "--:--", "Out": t_out.strftime('%H:%M'), "Status": "In Missing"})
+                row_m[d] = "Miss"; continue
+            if not t_in_raw and not t_out:
+                a_cnt += 1; row_m[d] = "A"; row_ot[d] = 0; continue
 
-    elif choice == "Miss Punch Tracker":
-        st.error("Miss Punches Identified:")
-        st.table(pd.DataFrame({
-            "Date": ["04-04-2026"], "Emp Name": ["Sonia Verma"], "Type": ["Out-Punch Missing"]
-        }))
+            # 2. 9:30 AM Hard Lock & 8.5 Hours Quota
+            t_in = max(t_in_raw, time(9, 30))
+            d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
+            work_hrs = (d2 - d1).total_seconds() / 3600
+            req_out = d1 + timedelta(hours=8.5)
+            early_min = (req_out - d2).total_seconds() / 60
 
-    elif choice == "Upload Excel Data":
-        st.file_uploader("Upload Attendance File", type=['xlsx'])
+            is_late = t_in_raw > time(9, 35)
+            is_early = early_min > 2 # 2-min grace logic
+            
+            if is_late: l_cnt += 1; l_dt_tm.append(f"{d}({t_in_raw.strftime('%H:%M')})")
+            if is_early: e_cnt += 1; e_dt_tm.append(f"{d}({t_out.strftime('%H:%M')})")
 
-    elif choice == "Holiday Settings":
-        st.date_input("Select Date")
-        st.text_input("Holiday Name")
-        if st.button("Add Holiday"): st.success("Holiday Added!")
+            # 3. Short Leave (SL) vs Half Day (AB/) Rules
+            day_ot = 0
+            if is_late or is_early:
+                # 9:35 to 10:15 SL Rule (Only once per month, and if not early out)
+                if sl_used_date == "--" and time(9, 35) < t_in_raw <= time(10, 15) and not is_early:
+                    day_status = "P (SL)"; sl_used_date = d; p_cnt += 1
+                else:
+                    day_status = "AB/"; ab_cnt += 1; ab_dates.append(d)
+            else:
+                day_status = "P"; p_cnt += 1
+                # 4. OT Slab Logic: .25, .50, .75, 1
+                if work_hrs > 8.5:
+                    ex = work_hrs - 8.5
+                    day_ot = 0.25 if ex < 2 else 0.5 if ex < 4 else 0.75 if ex < 6 else 1
 
-    else:
-        st.info(f"Generating data for {choice}...")
+            row_m[d], row_ot[d] = day_status, day_ot
+
+        # Data Packing for Final Reports
+        muster.append(row_m); ot_rep.append(row_ot)
+        ex_sum.append({
+            "Emp ID": emp_id, "Name": ename, 
+            "Total Late In": l_cnt, "Total Early Out": e_cnt, 
+            "SL Status": sl_used_date, "Total AB/ (Blue)": ab_cnt, "Total Absent (A)": a_cnt
+        })
+        ex_det.append({
+            "Emp ID": emp_id, "Name": ename, 
+            "Late In (Date:Time)": ", ".join(l_dt_tm), 
+            "Early Out (Date:Time)": ", ".join(e_dt_tm), 
+            "Final Status & AB/ Dates": f"SL Used: {sl_used_date} | AB/ Dates: {', '.join(ab_dates)}"
+        })
+
+    return pd.DataFrame(muster), pd.DataFrame(ot_rep), pd.DataFrame(ex_sum), pd.DataFrame(ex_det), pd.DataFrame(miss_p)
+
+# --- 4. APP UI ---
+if check_login():
+    st.sidebar.title("🍊 Orange House HR")
+    st.sidebar.info(f"User: {VALID_USERNAME}")
+    
+    nav = st.sidebar.selectbox("📋 रिपोर्ट का चयन करें", [
+        "1. Attendance Muster", "2. Overtime (OT) Report", 
+        "3. Exception Summary Report", "4. Exception Detailed Report", 
+        "5. Miss Punch Report", "6. Miss Punch Correction", "7. Attendance Summary"
+    ])
+    
+    uploaded_file = st.sidebar.file_uploader("बायोमेट्रिक एक्सेल फाइल अपलोड करें", type=['xlsx'])
+    nh_days = st.sidebar.multiselect("NH छुट्टियां चुनें", range(1, 32))
+
+    if uploaded_file:
+        m_df, o_df, s_df, d_df, mp_df = process_hr_system(pd.read_excel(uploaded_file), nh_days)
+        
+        # Display selection
+        active_df = pd.DataFrame()
+        if "1." in nav: active_df = m_df
+        elif "2." in nav: active_df = o_df
+        elif "3." in nav: active_df = s_df
+        elif "4." in nav: active_df = d_df
+        elif "5." in nav: active_df = mp_df
+        elif "7." in nav: active_df = s_df # Summary shared view
+        
+        st.subheader(nav)
+        if not active_df.empty:
+            st.dataframe(active_df, use_container_width=True)
+            
+            # --- DOWNLOAD BUTTONS ---
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                excel_bin = get_excel_download(active_df)
+                st.download_button(label="📥 Download as EXCEL", data=excel_bin, file_name=f"{nav}.xlsx")
+            with col2:
+                st.button("📄 Download as PDF (Coming Soon)")
+        else:
+            st.warning("इस रिपोर्ट के लिए कोई डेटा उपलब्ध नहीं है।")
+
+    if st.sidebar.button("Logout"):
+        st.session_state["authenticated"] = False
+        st.rerun()
