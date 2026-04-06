@@ -18,7 +18,6 @@ def parse_time_safe(val):
         if ':' in v:
             return datetime.strptime(v[:5], '%H:%M').time()
         else:
-            # Handle Excel float time
             return (datetime(1900, 1, 1) + timedelta(days=float(v))).time()
     except:
         return None
@@ -32,6 +31,20 @@ def get_ot(work_hrs, status, is_wo):
         ot_val = max(0, work_hrs - 8.5)
     
     if ot_val <= 0: return 0
-    # 15-min Rounding
+    
     h = int(ot_val)
-    m = (ot_val - h) *
+    # Fixed the missing 60 here!
+    m = (ot_val - h) * 60 
+    
+    if m < 15: rm = 0
+    elif m < 30: rm = 0.25
+    elif m < 45: rm = 0.50
+    elif m < 60: rm = 0.75
+    else: 
+        h += 1
+        rm = 0
+    return h + rm
+
+# --- 3. MAIN PROCESSING ---
+uploaded_file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
+report_choice = st.sidebar.selectbox("Select
