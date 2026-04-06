@@ -3,26 +3,25 @@ import pandas as pd
 from datetime import datetime, time, timedelta
 import io
 
-# --- 1. CONFIG & LOGIN ---
-st.set_page_config(page_title="Orange House HR Master", layout="wide")
+# --- 1. SETTINGS & LOGIN ---
+st.set_page_config(page_title="Orange House HR", layout="wide")
 
-def check_auth():
+def login():
     if 'auth' not in st.session_state: st.session_state.auth = False
     if not st.session_state.auth:
         st.markdown("<h2 style='text-align:center;'>🍊 Orange House Pvt Ltd</h2>", unsafe_allow_html=True)
-        with st.container():
-            u = st.text_input("User Name")
-            p = st.text_input("Password", type="password")
-            if st.button("Login"):
-                if u == "Orange_Hr" and p == "Orange_Admin":
-                    st.session_state.auth = True
-                    st.rerun()
-                else: st.error("Wrong Credentials")
+        u = st.text_input("User Name")
+        p = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if u == "Orange_Hr" and p == "Orange_Admin":
+                st.session_state.auth = True
+                st.rerun()
+            else: st.error("Invalid Login")
         st.stop()
 
-check_auth()
+login()
 
-# --- 2. HELPERS ---
+# --- 2. LOGIC HELPERS ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip().lower() in ['', 'nan', '00:00']: return None
     try:
@@ -32,21 +31,15 @@ def parse_t(v):
     except: return None
 
 def get_ot(hrs, status, is_h):
-    if is_h: val = hrs
-    elif status == "AB/": val = max(0, hrs - 4.0)
-    else: val = max(0, hrs - 8.5)
+    val = hrs if is_h else (max(0, hrs - 4.0) if status == "AB/" else max(0, hrs - 8.5))
     if val <= 0: return 0
-    h = int(val)
-    m = (val - h) * 60
-    rm = 0.25 if m >= 15 else 0
-    if m >= 30: rm = 0.50
-    if m >= 45: rm = 0.75
+    h, m = int(val), (val - int(val)) * 60
+    rm = 0.75 if m >= 45 else (0.50 if m >= 30 else (0.25 if m >= 15 else 0))
     return h + rm
 
 def style_m(v):
     colors = {'AB/': '#3498db', 'P (SL)': '#f1c40f', 'A': '#e74c3c', 'Miss': '#e67e22', 'P': '#2ecc71', 'H': '#bdc3c7'}
-    c = colors.get(v, '')
-    return f'background-color: {c}; color: {"white" if c else "black"}'
+    return f'background-color: {colors.get(v, "")}; color: {"white" if colors.get(v) else "black"}'
 
 # --- 3. MAIN APP ---
 st.sidebar.title("Navigation")
@@ -55,7 +48,7 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 f = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
-h_days = st.sidebar.multiselect("Select Holiday Dates", options=list(range(1, 32)))
+h_days = st.sidebar.multiselect("Select Holidays", options=list(range(1, 32)))
 nav = st.sidebar.radio("Reports", ["Muster", "OT Report", "Miss Punch", "Final Summary"])
 
 if f:
@@ -112,8 +105,19 @@ if f:
                 if s in ["P", "P (SL)"]: p += 1
                 elif s == "AB/": ab += 1
                 elif s == "A": a += 1
-                
                 r_m[d], r_o[d], tot_ot = s, dot, tot_ot + dot
             
             r_m.update({"P":p, "AB/":ab, "A":a, "H":h})
-            r_o["Total
+            r_o["Total OT"] = tot_ot
+            res_m.append(r_m); res_o.append(r_o)
+            res_f.append({"ID": eid, "Name": ename, "P": p, "AB/": ab, "A": a, "H": h, "OT": tot_ot})
+
+        maps = {"Muster": pd.DataFrame(res_m), "OT Report": pd.DataFrame(res_o), "Miss Punch": pd.DataFrame(res_mp), "Final Summary": pd.DataFrame(res_f)}
+        st.subheader(nav)
+        if nav == "Muster": st.dataframe(maps[nav].style.applymap(style_m), use_container_width=True)
+        else: st.dataframe(maps[nav], use_container_width=True)
+        
+        out = io.BytesIO()
+        maps[nav].to_excel(out, index=False)
+        st.download_button("Download", out.getvalue(), f"{nav}.xlsx")
+    except Exception as e: st.error(f"Error: {e}")
