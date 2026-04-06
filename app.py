@@ -3,130 +3,114 @@ import pandas as pd
 from datetime import datetime, time, timedelta
 import io
 
-# --- 1. CONFIGURATION & STYLING ---
-st.set_page_config(page_title="Orange House HR Master", layout="wide")
+st.set_page_config(page_title="Final OT System", layout="wide")
+st.title("📊 Final OT System (Clean Report - Only OT)")
 
-st.markdown("""
-    <style>
-    .main { background-color: #fdf2e9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #d35400; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
+def calculate_final_ot(total_hrs, is_full_ot_day):
+    if is_full_ot_day:
+        ot_exact = total_hrs
+    else:
+        # Normal din: 8.5 hours duty minus (e.g., 9:30 to 18:00)
+        ot_exact = max(0, total_hrs - 8.5)
+    
+    if ot_exact <= 0: return 0
+    
+    hours = int(ot_exact)
+    minutes = (ot_exact - hours) * 60
+    if minutes < 15: rounded_min = 0
+    elif minutes < 30: rounded_min = 0.25
+    elif minutes < 45: rounded_min = 0.50
+    elif minutes < 60: rounded_min = 0.75
+    else:
+        hours += 1
+        rounded_min = 0
+    return hours + rounded_min
 
-# --- 2. HELPER FUNCTIONS (TIME & EXPORT) ---
-def parse_t(val):
-    if pd.isna(val) or str(val).strip() in ['', 'nan', '00:00']: return None
-    try: return datetime.strptime(str(val).strip(), '%H:%M').time()
-    except: return None
-
-def get_excel_download(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-    return output.getvalue()
-
-# --- 3. MASTER PROCESSING ENGINE (ALL RULES INCLUDED) ---
-def process_hr_system(df, nh_list):
+def process_data(df):
     df.columns = [str(c).strip() for c in df.columns]
-    id_col, name_col = df.columns[0], df.columns[1]
-    df[id_col] = df[id_col].ffill()
-    df[name_col] = df[name_col].ffill()
-    dates = [c for c in df.columns if c.isdigit()]
+    cols = df.columns.tolist()
     
-    muster, ot_rep, ex_sum, ex_det, miss_p = [], [], [], [], []
+    emp_id_col = next((c for c in cols if 'id' in c.lower()), None)
+    name_col = next((c for c in cols if 'name' in c.lower()), None)
+    header_col = next((c for c in cols if 'date' in c.lower() or 'type' in c.lower() or 'status' in c.lower()), None)
 
-    for eid in df[id_col].unique():
+    if not emp_id_col or not header_col:
+        st.error("Excel mein 'Emp ID' aur 'Date/Status' column nahi mila!")
+        return None
+
+    # ID aur Name ko niche tak fill karein processing ke liye
+    df[emp_id_col] = df[emp_id_col].ffill()
+    if name_col: df[name_col] = df[name_col].ffill()
+    
+    date_cols = [c for c in cols if str(c).replace('.0','').isdigit()]
+    clean_ot_records = []
+
+    for eid in df[emp_id_col].unique():
         if pd.isna(eid): continue
-        block = df[df[id_col] == eid].reset_index(drop=True)
-        ename, emp_id = block.iloc[0][name_col], str(int(float(eid)))
         
-        row_m, row_ot = {"Emp ID": emp_id, "Name": ename}, {"Emp ID": emp_id, "Name": ename}
-        l_cnt, e_cnt, ab_cnt, a_cnt, p_cnt = 0, 0, 0, 0, 0
-        l_dt_tm, e_dt_tm, ab_dates = [], [], []
-        sl_used_date = "--"
+        emp_block = df[df[emp_id_col] == eid]
+        name = emp_block[name_col].iloc[0] if name_col else "Unknown"
+        
+        # Background mein rows identify karein
+        st_row = emp_block[emp_block[header_col].astype(str).str.contains('Status|P|A|WO', case=False, na=False)].head(1)
+        in_row = emp_block[emp_block[header_col].astype(str).str.contains('In', case=False, na=False)].head(1)
+        out_row = emp_block[emp_block[header_col].astype(str).str.contains('Out', case=False, na=False)].head(1)
 
-        for d in dates:
-            t_in_raw = parse_t(block.iloc[1][d])
-            t_out = parse_t(block.iloc[2][d])
+        # Sirf ek row banayenge is Employee ke liye
+        emp_summary = {"Emp ID": eid, "Name": name}
+        total_month_ot = 0
+
+        for day in date_cols:
+            try:
+                status_val = str(st_row[day].values[0]).strip().upper() if not st_row.empty else ''
+                in_val = str(in_row[day].values[0]).strip() if not in_row.empty else ''
+                out_val = str(out_row[day].values[0]).strip() if not out_row.empty else ''
+
+                if out_val.lower() in ['nan', '', '0', '00:00']:
+                    emp_summary[day] = 0
+                    continue
+
+                day_num = int(str(day).replace('.0',''))
+                is_full_ot_day = (day_num in [4, 21]) or ('WO' in status_val) or ('WOP' in status_val)
+
+                def parse_t(val):
+                    if ':' in val: return datetime.strptime(val[:5], '%H:%M').time()
+                    return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
+
+                t_out = parse_t(out_val)
+                # RULE: Holiday/Off par actual In, normal din par fixed 9:30 AM
+                t_in = parse_t(in_val) if (is_full_ot_day and in_val not in ['', 'nan', '0']) else time(9, 30)
+
+                dt_in = datetime.combine(datetime.today(), t_in)
+                dt_out = datetime.combine(datetime.today(), t_out)
+                if dt_out <= dt_in: dt_out += timedelta(days=1)
+                
+                total_hrs = (dt_out - dt_in).total_seconds() / 3600
+                daily_ot = calculate_final_ot(total_hrs, is_full_ot_day)
+                
+                emp_summary[day] = daily_ot
+                total_month_ot += daily_ot
+            except:
+                emp_summary[day] = 0
+        
+        emp_summary["Total Month OT"] = total_month_ot
+        clean_ot_records.append(emp_summary)
+
+    return pd.DataFrame(clean_ot_records)
+
+uploaded_file = st.file_uploader("Upload Attendance Excel", type=['xlsx'])
+if uploaded_file:
+    df_raw = pd.read_excel(uploaded_file)
+    if not any('id' in str(c).lower() for c in df_raw.columns):
+        df_raw = pd.read_excel(uploaded_file, header=1)
+
+    if st.button("🚀 Generate Clean OT Report"):
+        final_df = process_data(df_raw)
+        if final_df is not None:
+            st.success("Report Taiyar Hai! Isme sirf calculated OT dikhega.")
+            st.dataframe(final_df)
             
-            # Rule: Miss Punch (Single Missing Only)
-            if (t_in_raw and not t_out):
-                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In Time": t_in_raw.strftime('%H:%M'), "Out Time": "--:--", "Current Status": "Out Punch Miss"})
-                row_m[d] = "Miss"; continue
-            if (not t_in_raw and t_out):
-                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In Time": "--:--", "Out Time": t_out.strftime('%H:%M'), "Current Status": "In Punch Miss"})
-                row_m[d] = "Miss"; continue
-            if not t_in_raw and not t_out:
-                a_cnt += 1; row_m[d] = "A"; row_ot[d] = 0; continue
-
-            # Rule: 9:30 AM Hard Lock
-            t_in = max(t_in_raw, time(9, 30))
-            d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
-            work_hrs = (d2 - d1).total_seconds() / 3600
-            req_out = d1 + timedelta(hours=8.5)
-            early_min = (req_out - d2).total_seconds() / 60
-
-            # Violation Checks
-            is_late = t_in_raw > time(9, 35)
-            is_early = early_min > 2 # 2-min grace
-            
-            if is_late: l_cnt += 1; l_dt_tm.append(f"{d}({t_in_raw.strftime('%H:%M')})")
-            if is_early: e_cnt += 1; e_dt_tm.append(f"{d}({t_out.strftime('%H:%M')})")
-
-            # Status Decision (SL vs AB/ vs P)
-            day_ot = 0
-            if is_late or is_early:
-                if sl_used_date == "--" and time(9, 35) < t_in_raw <= time(10, 15) and not is_early:
-                    day_status = "P (SL)"; sl_used_date = d; p_cnt += 1
-                else:
-                    day_status = "AB/"; ab_cnt += 1; ab_dates.append(d)
-            else:
-                day_status = "P"; p_cnt += 1
-                # OT Slab: .25, .50, .75, 1
-                if work_hrs > 8.5:
-                    ex = work_hrs - 8.5
-                    day_ot = 0.25 if ex < 2 else 0.5 if ex < 4 else 0.75 if ex < 6 else 1
-
-            row_m[d], row_ot[d] = day_status, day_ot
-
-        # Packing Reports
-        muster.append(row_m); ot_rep.append(row_ot)
-        ex_sum.append({"Emp ID": emp_id, "Name": ename, "Total Late In": l_cnt, "Total Early Out": e_cnt, "SL Status": sl_used_date, "Total AB/": ab_cnt, "Total Absent": a_cnt})
-        ex_det.append({"Emp ID": emp_id, "Name": ename, "Late In (Date:Time)": ", ".join(l_dt_tm), "Early Out (Date:Time)": ", ".join(e_dt_tm), "Final Status & AB/ Dates": f"SL: {sl_used_date} | AB/ Dates: {', '.join(ab_dates)}"})
-
-    return pd.DataFrame(muster), pd.DataFrame(ot_rep), pd.DataFrame(ex_sum), pd.DataFrame(ex_det), pd.DataFrame(miss_p)
-
-# --- 4. APP UI & NAVIGATION ---
-st.title("🍊 Orange House HR Master System")
-
-with st.sidebar:
-    st.header("Control Panel")
-    nav = st.selectbox("Select Report Type", [
-        "1. Attendance Muster", "2. Overtime (OT) Report", "3. Exception Summary Report",
-        "4. Exception Detailed Report", "5. Miss Punch Report", "6. Miss Punch Correction", "7. Attendance Summary"
-    ])
-    f = st.file_uploader("Upload Excel File", type=['xlsx'])
-    h = st.multiselect("Select NH Holidays", range(1, 32))
-
-if f:
-    m_df, o_df, s_df, d_df, mp_df = process_hr_system(pd.read_excel(f), h)
-    
-    # Logic to show selected report
-    active_df = pd.DataFrame()
-    if "1." in nav: active_df = m_df
-    elif "2." in nav: active_df = o_df
-    elif "3." in nav: active_df = s_df
-    elif "4." in nav: active_df = d_df
-    elif "5." in nav: active_df = mp_df
-    
-    st.subheader(nav)
-    st.dataframe(active_df, use_container_width=True)
-
-    # --- DOWNLOAD SECTION ---
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    with c1:
-        xl_data = get_excel_download(active_df)
-        st.download_button(label="📥 Download as EXCEL", data=xl_data, file_name=f"{nav}.xlsx", mime="application/vnd.ms-excel")
-    with c2:
-        st.button("📄 Download as PDF (Coming Soon)") # PDF Logic needs additional library config
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                final_df.to_excel(writer, index=False)
+            st.download_button("📥 Download Clean OT Excel", output.getvalue(), "Clean_OT_Report.xlsx")
