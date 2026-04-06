@@ -3,78 +3,122 @@ import pandas as pd
 from datetime import datetime, time, timedelta
 import io
 
-# --- Page Configuration ---
-st.set_page_config(page_title="Master HR Dashboard", layout="wide")
-st.title("🛡️ Master Attendance & OT Management System (Locked)")
+st.set_page_config(page_title="Final OT System", layout="wide")
+st.title("📊 Final OT System (Clean Report - Only OT)")
 
-# --- Utility Functions ---
-def parse_time(val):
-    if not val or str(val).lower() in ['nan', '', '0', '00:00']: return None
-    try:
-        if ':' in str(val):
-            return datetime.strptime(str(val)[:5], '%H:%M').time()
-        return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
-    except: return None
+def calculate_final_ot(total_hrs, is_full_ot_day):
+    if is_full_ot_day:
+        ot_exact = total_hrs
+    else:
+        # Normal din: 8.5 hours duty minus
+        ot_exact = max(0, total_hrs - 8.5)
+    
+    if ot_exact <= 0: return 0
+    
+    hours = int(ot_exact)
+    minutes = (ot_exact - hours) * 60
+    if minutes < 15: rounded_min = 0
+    elif minutes < 30: rounded_min = 0.25
+    elif minutes < 45: rounded_min = 0.50
+    elif minutes < 60: rounded_min = 0.75
+    else:
+        hours += 1
+        rounded_min = 0
+    return hours + rounded_min
 
-def format_hhmm(hours_decimal):
-    if hours_decimal <= 0: return "00:00"
-    total_min = int(round(hours_decimal * 60))
-    hh = total_min // 60
-    mm = total_min % 60
-    return f"{hh:02d}:{mm:02d}"
-
-# --- Core Processing Logic ---
-def process_hr_data(df, holiday_list):
+def process_data(df):
     df.columns = [str(c).strip() for c in df.columns]
     cols = df.columns.tolist()
+    
     emp_id_col = next((c for c in cols if 'id' in c.lower()), None)
-    header_col = next((c for c in cols if any(x in c.lower() for x in ['date', 'status', 'type'])), None)
-    
+    name_col = next((c for c in cols if 'name' in c.lower()), None)
+    header_col = next((c for c in cols if 'date' in c.lower() or 'type' in c.lower() or 'status' in c.lower()), None)
+
+    if not emp_id_col or not header_col:
+        st.error("Excel mein 'Emp ID' aur 'Date/Status' column nahi mila!")
+        return None
+
     df[emp_id_col] = df[emp_id_col].ffill()
-    date_cols = [c for c in cols if str(c).replace('.0','').isdigit()]
+    if name_col: df[name_col] = df[name_col].ffill()
     
-    final_data = []
-    sl_count = {} # Employee Short Leave Tracker
+    date_cols = [c for c in cols if str(c).replace('.0','').isdigit()]
+    clean_ot_records = []
 
     for eid in df[emp_id_col].unique():
         if pd.isna(eid): continue
+        
         emp_block = df[df[emp_id_col] == eid]
-        name = emp_block.iloc[0].get('Name', 'Unknown')
-        sl_count[eid] = 0
-
-        # Identifying Data Rows
-        st_row = emp_block[emp_block[header_col].astype(str).str.contains('Status', case=False, na=False)].head(1)
+        name = emp_block[name_col].iloc[0] if name_col else "Unknown"
+        
+        st_row = emp_block[emp_block[header_col].astype(str).str.contains('Status|P|A|WO', case=False, na=False)].head(1)
         in_row = emp_block[emp_block[header_col].astype(str).str.contains('In', case=False, na=False)].head(1)
         out_row = emp_block[emp_block[header_col].astype(str).str.contains('Out', case=False, na=False)].head(1)
 
+        emp_summary = {"Emp ID": eid, "Name": name}
+        total_month_ot = 0
+
         for day in date_cols:
-            d_num = int(str(day).replace('.0',''))
-            orig_status = str(st_row[day].values[0]).strip().upper() if not st_row.empty else ""
-            t_in = parse_time(in_row[day].values[0]) if not in_row.empty else None
-            t_out = parse_time(out_row[day].values[0]) if not out_row.empty else None
+            try:
+                status_val = str(st_row[day].values[0]).strip().upper() if not st_row.empty else ''
+                in_val = str(in_row[day].values[0]).strip() if not in_row.empty else ''
+                out_val = str(out_row[day].values[0]).strip() if not out_row.empty else ''
+
+                if out_val.lower() in ['nan', '', '0', '00:00']:
+                    emp_summary[day] = 0
+                    continue
+
+                day_num = int(str(day).replace('.0',''))
+                is_full_ot_day = (day_num in [4, 21]) or ('WO' in status_val) or ('WOP' in status_val)
+
+                def parse_t(val):
+                    if ':' in val: return datetime.strptime(val[:5], '%H:%M').time()
+                    return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
+
+                t_out = parse_t(out_val)
+                actual_in = parse_t(in_val)
+                
+                # --- NAYA RULE LOGIC START ---
+                if is_full_ot_day:
+                    t_in = actual_in
+                else:
+                    # Agar 9:30 AM ke baad aur 10:15 AM tak aaye hain (Late arrival)
+                    if actual_in > time(9, 30) and actual_in <= time(10, 15):
+                        t_in = actual_in
+                    else:
+                        # Baaki sabke liye fixed 9:30 AM (Jo jaldi aaye ya 10:15 ke bhi baad aaye)
+                        t_in = time(9, 30)
+                # --- NAYA RULE LOGIC END ---
+
+                dt_in = datetime.combine(datetime.today(), t_in)
+                dt_out = datetime.combine(datetime.today(), t_out)
+                if dt_out <= dt_in: dt_out += timedelta(days=1)
+                
+                total_hrs = (dt_out - dt_in).total_seconds() / 3600
+                daily_ot = calculate_final_ot(total_hrs, is_full_ot_day)
+                
+                emp_summary[day] = daily_ot
+                total_month_ot += daily_ot
+            except:
+                emp_summary[day] = 0
+        
+        emp_summary["Total Month OT"] = total_month_ot
+        clean_ot_records.append(emp_summary)
+
+    return pd.DataFrame(clean_ot_records)
+
+uploaded_file = st.file_uploader("Upload Attendance Excel", type=['xlsx'])
+if uploaded_file:
+    df_raw = pd.read_excel(uploaded_file)
+    if not any('id' in str(c).lower() for c in df_raw.columns):
+        df_raw = pd.read_excel(uploaded_file, header=1)
+
+    if st.button("🚀 Generate Clean OT Report"):
+        final_df = process_data(df_raw)
+        if final_df is not None:
+            st.success("Report Taiyar Hai! Late arrival (upto 10:15) adjust kar diya gaya hai.")
+            st.dataframe(final_df)
             
-            is_holiday = (d_num in holiday_list) or any(x in orig_status for x in ['WO', 'WOP', 'W'])
-
-            row = {
-                "Emp ID": eid, "Name": name, "Date": d_num,
-                "In": t_in, "Out": t_out, "Status": "A", "OT": 0, 
-                "Early_Min": 0, "Delay_Min": 0, "Duration": 0, "Display": ""
-            }
-
-            # 1. Miss Punch Rule
-            if (t_in and not t_out) or (not t_in and t_out):
-                row["Display"] = "MIS-P"
-                row["Status"] = "MIS-P"
-                final_data.append(row)
-                continue
-
-            if not t_in or not t_out:
-                row["Display"] = orig_status if is_holiday else "A"
-                final_data.append(row)
-                continue
-
-            # 2. Working Duration Calculation
-            eff_in = max(datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), time(9, 30)))
-            work_hrs = (datetime.combine(datetime.today(), t_out) - eff_in).total_seconds() / 3600
-            if t_out < t_in: work_hrs += 24
-            row["
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                final_df.to_excel(writer, index=False)
+            st.download_button("📥 Download Clean OT Excel", output.getvalue(), "Clean_OT_Report.xlsx")
