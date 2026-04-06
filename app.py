@@ -16,14 +16,18 @@ def parse_t(val):
     except: return None
 
 def calculate_ot_final(work_hrs, status, is_wo):
-    # Rule: Sunday/Holiday par Full OT. AB/ par 4 hrs ke upar OT. P par 8.5 ke upar.
-    if is_wo: ot_exact = work_hrs
-    elif status == "AB/": ot_exact = max(0, work_hrs - 4.0)
-    else: ot_exact = max(0, work_hrs - 8.5)
+    # Strict Rule Implementation
+    if is_wo: 
+        ot_exact = work_hrs  # Sunday/Holiday = Full OT
+    elif status == "AB/": 
+        ot_exact = max(0, work_hrs - 4.0) # Half Day = Hours above 4
+    else: 
+        ot_exact = max(0, work_hrs - 8.5) # Present/SL = Hours above 8.5
     
     if ot_exact <= 0: return 0
     h = int(ot_exact)
     m = (ot_exact - h) * 60
+    # 15-min Rounding
     if m < 15: rm = 0
     elif m < 30: rm = 0.25
     elif m < 45: rm = 0.50
@@ -33,13 +37,4 @@ def calculate_ot_final(work_hrs, status, is_wo):
 
 # --- 3. CORE PROCESSING ENGINE ---
 def process_hr_master(df):
-    # Fixed Holidays & Sundays as per your instruction
-    fixed_wo = [1, 4, 8, 15, 21, 22, 29] 
-    
-    df.columns = [str(c).strip() for c in df.columns]
-    id_col, name_col = df.columns[0], df.columns[1]
-    df[id_col] = df[id_col].ffill()
-    df[name_col] = df[name_col].ffill()
-    
-    dates = [c for c in df.columns if str(c).replace('.0','').isdigit()]
-    muster, ot_rep, ex_sum, ex_det, miss_p, final_sum = [], [], [], [], [], []
+    # Fixed Sundays: 1, 8, 15, 22, 29 | Holidays: 4,
