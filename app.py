@@ -3,164 +3,153 @@ import pandas as pd
 from datetime import datetime, time, timedelta
 import io
 
-# --- 1. CONFIGURATION & LOGIN SECURITY ---
-st.set_page_config(page_title="Orange House HR Master System", layout="wide")
+# --- Page Config ---
+st.set_page_config(page_title="Master HR System", layout="wide")
 
-VALID_USERNAME = "Orange_HR"
-VALID_PASSWORD = "Orange_Admin"
-
-def check_login():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-
-    if not st.session_state["authenticated"]:
-        st.markdown("<h2 style='text-align: center; color: #d35400;'>🍊 Orange House HR Login</h2>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            user = st.text_input("यूजरनेम (Username):")
-            pwd = st.text_input("पासवर्ड (Password):", type="password")
-            if st.button("Login"):
-                if user == VALID_USERNAME and pwd == VALID_PASSWORD:
-                    st.session_state["authenticated"] = True
-                    st.rerun()
-                else:
-                    st.error("गलत यूजरनेम या पासवर्ड! कृपया सही क्रेडेंशियल डालें।")
-        return False
-    return True
-
-# --- 2. CORE UTILITIES ---
-def parse_t(val):
-    if pd.isna(val) or str(val).strip() in ['', 'nan', '00:00']: return None
-    try: return datetime.strptime(str(val).strip(), '%H:%M').time()
+# --- Helper Functions ---
+def parse_time(val):
+    if not val or str(val).lower() in ['nan', '', '0', '00:00']: return None
+    try:
+        if ':' in str(val):
+            return datetime.strptime(str(val)[:5], '%H:%M').time()
+        return (datetime(1900, 1, 1) + timedelta(days=float(val))).time()
     except: return None
 
-def get_excel_download(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
-    return output.getvalue()
+def format_hhmm(hours_decimal):
+    if hours_decimal <= 0: return "00:00"
+    total_min = int(hours_decimal * 60)
+    hh = total_min // 60
+    mm = total_min % 60
+    return f"{hh:02d}:{mm:02d}"
 
-# --- 3. MASTER CALCULATION ENGINE (ALL RULES) ---
-def process_hr_system(df, nh_list):
+# --- Main Logic ---
+def process_data(df, holiday_dates):
     df.columns = [str(c).strip() for c in df.columns]
-    id_col, name_col = df.columns[0], df.columns[1]
-    df[id_col] = df[id_col].ffill()
-    df[name_col] = df[name_col].ffill()
-    dates = [c for c in df.columns if c.isdigit()]
+    cols = df.columns.tolist()
+    emp_id_col = next((c for c in cols if 'id' in c.lower()), None)
+    header_col = next((c for c in cols if any(x in c.lower() for x in ['date', 'status', 'type'])), None)
     
-    muster, ot_rep, ex_sum, ex_det, miss_p = [], [], [], [], []
+    df[emp_id_col] = df[emp_id_col].ffill()
+    date_cols = [c for c in cols if str(c).replace('.0','').isdigit()]
+    
+    master_records = []
+    sl_tracker = {} # {emp_id: count}
 
-    for eid in df[id_col].unique():
+    for eid in df[emp_id_col].unique():
         if pd.isna(eid): continue
-        block = df[df[id_col] == eid].reset_index(drop=True)
-        ename, emp_id = block.iloc[0][name_col], str(int(float(eid)))
-        
-        row_m, row_ot = {"Emp ID": emp_id, "Name": ename}, {"Emp ID": emp_id, "Name": ename}
-        l_cnt, e_cnt, ab_cnt, a_cnt, p_cnt = 0, 0, 0, 0, 0
-        l_dt_tm, e_dt_tm, ab_dates = [], [], []
-        sl_used_date = "--"
+        emp_block = df[df[emp_id_col] == eid]
+        name = emp_block.iloc[0].get('Name', 'Unknown')
+        sl_tracker[eid] = 0
 
-        for d in dates:
-            t_in_raw = parse_t(block.iloc[1][d])
-            t_out = parse_t(block.iloc[2][d])
+        st_row = emp_block[emp_block[header_col].astype(str).str.contains('Status', case=False, na=False)].head(1)
+        in_row = emp_block[emp_block[header_col].astype(str).str.contains('In', case=False, na=False)].head(1)
+        out_row = emp_block[emp_block[header_col].astype(str).str.contains('Out', case=False, na=False)].head(1)
+
+        for day in date_cols:
+            day_int = int(str(day).replace('.0',''))
+            status_orig = str(st_row[day].values[0]).strip().upper() if not st_row.empty else ""
+            in_t = parse_time(in_row[day].values[0]) if not in_row.empty else None
+            out_t = parse_time(out_row[day].values[0]) if not out_row.empty else None
             
-            # 1. Miss Punch Rule (Single Punch Missing)
-            if (t_in_raw and not t_out):
-                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In": t_in_raw.strftime('%H:%M'), "Out": "--:--", "Status": "Out Missing"})
-                row_m[d] = "Miss"; continue
-            if (not t_in_raw and t_out):
-                miss_p.append({"Emp ID": emp_id, "Name": ename, "Date": d, "In": "--:--", "Out": t_out.strftime('%H:%M'), "Status": "In Missing"})
-                row_m[d] = "Miss"; continue
-            if not t_in_raw and not t_out:
-                a_cnt += 1; row_m[d] = "A"; row_ot[d] = 0; continue
+            # Holiday Check
+            is_holiday = (day_int in holiday_dates) or ('WO' in status_orig) or ('WOP' in status_orig)
 
-            # 2. 9:30 AM Hard Lock & 8.5 Hours Quota
-            t_in = max(t_in_raw, time(9, 30))
-            d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
-            work_hrs = (d2 - d1).total_seconds() / 3600
-            req_out = d1 + timedelta(hours=8.5)
-            early_min = (req_out - d2).total_seconds() / 60
+            res = {
+                "Emp ID": eid, "Name": name, "Date": day_int,
+                "In": in_t, "Out": out_t, "Status": "A", "OT": 0, 
+                "Early_Min": 0, "Delay_Min": 0, "Duration": 0, "Color": ""
+            }
 
-            is_late = t_in_raw > time(9, 35)
-            is_early = early_min > 2 # 2-min grace logic
-            
-            if is_late: l_cnt += 1; l_dt_tm.append(f"{d}({t_in_raw.strftime('%H:%M')})")
-            if is_early: e_cnt += 1; e_dt_tm.append(f"{d}({t_out.strftime('%H:%M')})")
-
-            # 3. Short Leave (SL) vs Half Day (AB/) Rules
-            day_ot = 0
-            if is_late or is_early:
-                # 9:35 to 10:15 SL Rule (Only once per month, and if not early out)
-                if sl_used_date == "--" and time(9, 35) < t_in_raw <= time(10, 15) and not is_early:
-                    day_status = "P (SL)"; sl_used_date = d; p_cnt += 1
-                else:
-                    day_status = "AB/"; ab_cnt += 1; ab_dates.append(d)
+            if (in_t and not out_t) or (not in_t and out_t):
+                res["Status"] = "MIS-P"
+                res["Color"] = "Orange"
+            elif not in_t or not out_t:
+                res["Status"] = status_orig if is_holiday else "A"
+                if is_holiday: res["Color"] = "Green"
             else:
-                day_status = "P"; p_cnt += 1
-                # 4. OT Slab Logic: .25, .50, .75, 1
-                if work_hrs > 8.5:
-                    ex = work_hrs - 8.5
-                    day_ot = 0.25 if ex < 2 else 0.5 if ex < 4 else 0.75 if ex < 6 else 1
+                # Calculations
+                eff_in = max(datetime.combine(datetime.today(), in_t), datetime.combine(datetime.today(), time(9, 30)))
+                duration = (datetime.combine(datetime.today(), out_t) - eff_in).total_seconds() / 3600
+                if out_t < in_t: duration += 24
+                res["Duration"] = duration
 
-            row_m[d], row_ot[d] = day_status, day_ot
+                # Late Logic
+                if in_t > time(9, 35):
+                    delay = (datetime.combine(datetime.today(), in_t) - datetime.combine(datetime.today(), time(9, 30))).total_seconds() / 60
+                    res["Delay_Min"] = int(delay)
 
-        # Data Packing for Final Reports
-        muster.append(row_m); ot_rep.append(row_ot)
-        ex_sum.append({
-            "Emp ID": emp_id, "Name": ename, 
-            "Total Late In": l_cnt, "Total Early Out": e_cnt, 
-            "SL Status": sl_used_date, "Total AB/ (Blue)": ab_cnt, "Total Absent (A)": a_cnt
-        })
-        ex_det.append({
-            "Emp ID": emp_id, "Name": ename, 
-            "Late In (Date:Time)": ", ".join(l_dt_tm), 
-            "Early Out (Date:Time)": ", ".join(e_dt_tm), 
-            "Final Status & AB/ Dates": f"SL Used: {sl_used_date} | AB/ Dates: {', '.join(ab_dates)}"
-        })
+                # Category Assignment
+                if is_holiday:
+                    res["Status"] = status_orig if status_orig else "W"
+                    res["Color"] = "Green"
+                    res["OT"] = duration
+                elif in_t >= time(10, 16):
+                    res["Status"] = "AB/"
+                    res["Color"] = "Blue"
+                    res["OT"] = max(0, duration - 4.0)
+                elif 5.8 <= duration <= 6.2: # Short Leave
+                    if sl_tracker[eid] < 1:
+                        res["Status"] = "P"
+                        res["Color"] = "Yellow"
+                        sl_tracker[eid] += 1
+                        res["OT"] = 0
+                    else:
+                        res["Status"] = "AB/"
+                        res["Color"] = "Blue"
+                        res["OT"] = max(0, duration - 4.0)
+                else:
+                    res["Status"] = "P"
+                    res["OT"] = max(0, duration - 8.5)
+                
+                # Early Out Check (8:30 hours = 8.5)
+                if not is_holiday and duration < 8.5:
+                    early_min = (8.5 - duration) * 60
+                    res["Early_Min"] = int(early_min)
 
-    return pd.DataFrame(muster), pd.DataFrame(ot_rep), pd.DataFrame(ex_sum), pd.DataFrame(ex_det), pd.DataFrame(miss_p)
+            master_records.append(res)
+    return pd.DataFrame(master_records)
 
-# --- 4. APP UI ---
-if check_login():
-    st.sidebar.title("🍊 Orange House HR")
-    st.sidebar.info(f"User: {VALID_USERNAME}")
+# --- UI Layout ---
+st.sidebar.header("⚙️ Settings")
+holiday_input = st.sidebar.multiselect("Select National Holidays (Dates):", range(1, 32))
+
+uploaded_file = st.file_uploader("Upload Attendance Excel", type=['xlsx'])
+
+if uploaded_file:
+    raw_df = pd.read_excel(uploaded_file, header=1)
+    full_data = process_data(raw_df, holiday_input)
     
-    nav = st.sidebar.selectbox("📋 रिपोर्ट का चयन करें", [
-        "1. Attendance Muster", "2. Overtime (OT) Report", 
-        "3. Exception Summary Report", "4. Exception Detailed Report", 
-        "5. Miss Punch Report", "6. Miss Punch Correction", "7. Attendance Summary"
-    ])
-    
-    uploaded_file = st.sidebar.file_uploader("बायोमेट्रिक एक्सेल फाइल अपलोड करें", type=['xlsx'])
-    nh_days = st.sidebar.multiselect("NH छुट्टियां चुनें", range(1, 32))
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Master", "❓ Miss Punch", "🕒 Late Coming", "🚪 Early Out", "💰 Daily OT"])
 
-    if uploaded_file:
-        m_df, o_df, s_df, d_df, mp_df = process_hr_system(pd.read_excel(uploaded_file), nh_days)
-        
-        # Display selection
-        active_df = pd.DataFrame()
-        if "1." in nav: active_df = m_df
-        elif "2." in nav: active_df = o_df
-        elif "3." in nav: active_df = s_df
-        elif "4." in nav: active_df = d_df
-        elif "5." in nav: active_df = mp_df
-        elif "7." in nav: active_df = s_df # Summary shared view
-        
-        st.subheader(nav)
-        if not active_df.empty:
-            st.dataframe(active_df, use_container_width=True)
-            
-            # --- DOWNLOAD BUTTONS ---
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                excel_bin = get_excel_download(active_df)
-                st.download_button(label="📥 Download as EXCEL", data=excel_bin, file_name=f"{nav}.xlsx")
-            with col2:
-                st.button("📄 Download as PDF (Coming Soon)")
-        else:
-            st.warning("इस रिपोर्ट के लिए कोई डेटा उपलब्ध नहीं है।")
+    with tab1:
+        st.subheader("Attendance Master (P, AB/, W)")
+        pivot_master = full_data.pivot(index=["Emp ID", "Name"], columns="Date", values="Status")
+        st.dataframe(pivot_master.style.applymap(lambda x: 'background-color: #00b050' if x in ['W','WO','WOP'] else ('background-color: #0070c0' if x == 'AB/' else '')))
 
-    if st.sidebar.button("Logout"):
-        st.session_state["authenticated"] = False
-        st.rerun()
+    with tab2:
+        st.subheader("Orange Alert: Miss Punch")
+        miss = full_data[full_data["Status"] == "MIS-P"]
+        st.table(miss[["Emp ID", "Name", "Date", "In", "Out"]])
+
+    with tab3:
+        st.subheader("Late Coming (> 09:35)")
+        late = full_data[full_data["Delay_Min"] > 5]
+        late["Delay"] = late["Delay_Min"].apply(lambda x: f"{x} Min")
+        st.table(late[["Emp ID", "Name", "Date", "In", "Delay", "Status"]])
+
+    with tab4:
+        st.subheader("Early Out (< 08:30 Hours)")
+        early = full_data[full_data["Early_Min"] > 0]
+        early["Work Duration"] = early["Duration"].apply(format_hhmm)
+        early["Early By"] = early["Early_Min"].apply(lambda x: f"{x} Min")
+        st.table(early[["Emp ID", "Name", "Date", "In", "Out", "Work Duration", "Early By"]])
+
+    with tab5:
+        st.subheader("Daily OT Report (HH:MM)")
+        full_data["OT_HHMM"] = full_data["OT"].apply(format_hhmm)
+        ot_pivot = full_data.pivot(index=["Emp ID", "Name"], columns="Date", values="OT_HHMM")
+        st.dataframe(ot_pivot)
+
+    # Download
+    csv = full_data.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Full Report", csv, "Final_Report.csv", "text/csv")
