@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
 
-# --- SETTINGS ---
+# --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Master", layout="wide", page_icon="🍊")
 
-# --- ALL 5 REPORTS ENGINE (LOCKED 100) ---
+# --- 2. THE ENGINE (LOCKED 100) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -99,47 +99,57 @@ if not st.session_state.auth:
     st.title("🍊 Orange House Login")
     u = st.text_input("User ID")
     p = st.text_input("Password", type="password")
-    if st.button("Access System"):
+    if st.button("Access Dashboard"):
         if u == "admin" and p == "orange786": st.session_state.auth = True; st.rerun()
 else:
-    # SAARI REPORTS SIDEBAR MEIN KHOL DI HAIN
-    st.sidebar.title("Navigation")
-    menu = st.sidebar.radio("Select Section", [
-        "📤 Data Upload", 
-        "🛠️ Punch Correction", 
+    # --- SIDEBAR INTEGRATED SETUP ---
+    st.sidebar.title("🍊 Orange Master Setup")
+    
+    # 1. Excel Upload directly in Sidebar
+    st.sidebar.subheader("📁 Data Source")
+    file = st.sidebar.file_uploader("Upload Biometric File", type=['xlsx'])
+    if file: st.session_state.data = pd.read_excel(file)
+    
+    # 2. Holiday Selection directly in Sidebar
+    st.sidebar.subheader("📅 Holidays")
+    st.session_state.hols = st.sidebar.multiselect("Select Monthly Holidays:", range(1, 32), default=st.session_state.hols)
+
+    st.sidebar.markdown("---")
+    
+    # 3. Navigation for Reports and Corrections
+    st.sidebar.subheader("🚀 Navigation")
+    menu = st.sidebar.selectbox("Select View", [
         "📊 1. Attendance Muster", 
         "📈 2. Monthly Summary", 
         "💰 3. OT Slab Report", 
         "⚠️ 4. Late/Early Log", 
-        "❌ 5. Miss Punch List"
+        "❌ 5. Miss Punch List",
+        "🛠️ 6. Punch Correction Panel"
     ])
     
     if st.sidebar.button("Logout"): st.session_state.auth = False; st.rerun()
 
-    if menu == "📤 Data Upload":
-        st.header("Setup Page")
-        file = st.file_uploader("Upload Excel", type=['xlsx'])
-        if file: st.session_state.data = pd.read_excel(file)
-        st.session_state.hols = st.multiselect("Select Holidays:", range(1, 32), default=st.session_state.hols)
-
-    elif menu == "🛠️ Punch Correction":
-        st.header("Punch Correction & Transfer")
-        with st.form("c_form"):
-            cid = st.text_input("Emp ID")
-            cdt = st.number_input("Date", 1, 31)
-            cin = st.text_input("Correct IN")
-            cout = st.text_input("Correct OUT")
-            if st.form_submit_button("Update & Transfer"):
-                st.session_state.corrs.append({'id': cid, 'date': int(cdt), 'in': cin, 'out': cout})
-                st.success("Transfer Successful!")
-
-    elif st.session_state.data is not None:
+    # --- MAIN DISPLAY LOGIC ---
+    if st.session_state.data is not None:
         m, s, o, ex, mi = run_hr_engine(st.session_state.data, st.session_state.hols, st.session_state.corrs)
         
-        if menu == "📊 1. Attendance Muster": st.subheader("Muster Report"); st.dataframe(m)
-        elif menu == "📈 2. Monthly Summary": st.subheader("Summary Report"); st.dataframe(s)
-        elif menu == "💰 3. OT Slab Report": st.subheader("OT Slab Report"); st.dataframe(o)
-        elif menu == "⚠️ 4. Late/Early Log": st.subheader("Late/Early Detail"); st.dataframe(ex)
-        elif menu == "❌ 5. Miss Punch List": st.subheader("Miss Punch Report"); st.dataframe(mi)
+        if menu == "🛠️ 6. Punch Correction Panel":
+            st.header("✍️ Miss Punch & Time Correction")
+            with st.form("corr_form"):
+                c1, c2 = st.columns(2)
+                cid = c1.text_input("Employee ID")
+                cdt = c2.number_input("Date", 1, 31)
+                cin = c1.text_input("Correct IN (HH:MM)")
+                cout = c2.text_input("Correct OUT (HH:MM)")
+                if st.form_submit_button("Update & Transfer to Reports"):
+                    st.session_state.corrs.append({'id': cid, 'date': int(cdt), 'in': cin, 'out': cout})
+                    st.success(f"ID {cid} updated for Date {cdt}!")
+        
+        # Displaying Reports
+        elif menu == "📊 1. Attendance Muster": st.header("Muster Report (A Status for Miss Punch)"); st.dataframe(m, use_container_width=True)
+        elif menu == "📈 2. Monthly Summary": st.header("Payroll Summary Report"); st.dataframe(s, use_container_width=True)
+        elif menu == "💰 3. OT Slab Report": st.header("Overtime Slab (8.5h/4h Rule)"); st.dataframe(o, use_container_width=True)
+        elif menu == "⚠️ 4. Late/Early Log": st.header("Late In & Early Out Detail"); st.dataframe(ex, use_container_width=True)
+        elif menu == "❌ 5. Miss Punch List": st.header("Miss Punch Report (Single Punch Only)"); st.dataframe(mi, use_container_width=True)
     else:
-        st.info("Pehle 'Data Upload' section mein file upload karein.")
+        st.info("Pehle Sidebar mein jaakar Biometric Excel file upload karein aur Holidays set karein.")
