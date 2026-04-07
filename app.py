@@ -40,7 +40,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+2, str(c['date'])] = c['out']
 
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [1, 8, 15, 22, 29] 
+    sundays = [5, 12, 19, 26] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
 
     for eid in df_w[id_c].unique():
@@ -142,7 +142,7 @@ if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
     u = st.text_input("User ID"); p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u == "admin" and p == "orange786": st.session_state.auth = True; st.rerun()
+        if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
         else: st.error("Wrong Password!")
 else:
     st.sidebar.title("🍊 Orange HR")
