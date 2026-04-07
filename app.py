@@ -31,7 +31,6 @@ def run_hr_engine(df, holidays, corrections):
     id_c, name_c = df_w.columns[0], df_w.columns[1]
     df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
     
-    # Correction logic
     for c in corrections:
         mask = df_w[id_c].astype(str).str.contains(str(c['id']))
         if any(mask):
@@ -40,7 +39,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+2, str(c['date'])] = c['out']
 
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [1, 8, 15, 22, 29] # Fixed Weekly Off dates
+    sundays = [1, 8, 15, 22, 29] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
 
     for eid in df_w[id_c].unique():
@@ -57,11 +56,11 @@ def run_hr_engine(df, holidays, corrections):
             d_i = int(float(d))
             t_in, t_out = parse_t(block.iloc[1][d]), parse_t(block.iloc[2][d])
             status, day_ot = "A", 0.0
-            is_holiday, is_sunday = d_i in holidays, d_i in sundays
+            is_off_day = d_i in holidays or d_i in sundays
 
             if not t_in and not t_out:
-                if is_sunday: status, wo_c = "WO", wo_c + 1
-                elif is_holiday: status, h_c = "H", h_c + 1
+                if d_i in sundays: status, wo_c = "WO", wo_c + 1
+                elif d_i in holidays: status, h_c = "H", h_c + 1
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
@@ -70,37 +69,44 @@ def run_hr_engine(df, holidays, corrections):
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
                 if d2 <= d1: d2 += timedelta(days=1)
                 
-                # Actual hours (gate to gate)
-                actual_hrs = (d2 - d1).total_seconds() / 3600
+                # Total Duration (Actual)
+                actual_duration = (d2 - d1).total_seconds() / 3600
 
-                if is_sunday: 
-                    status, wo_c = "WO", wo_c + 1
-                    day_ot = get_slab_ot(actual_hrs) # RULE: Full OT on WO
-                elif is_holiday: 
-                    status, h_c = "H", h_c + 1
-                    day_ot = get_slab_ot(actual_hrs) # RULE: Full OT on Holiday
+                if is_off_day:
+                    # RULE: Off day pe shift time ka koi jhanjhat nahi, pura time OT
+                    status = "WO" if d_i in sundays else "H"
+                    day_ot = get_slab_ot(actual_duration)
+                    if d_i in sundays: wo_c += 1 
+                    else: h_c += 1
                 else:
-                    status = "P"
-                    # Effective hours for normal working days
-                    t_eff_start = time(14, 0) if t_in >= time(13, 30) else max(t_in, time(9, 30))
-                    d1_eff = datetime.combine(datetime.today(), t_eff_start)
-                    eff_hrs = (d2 - d1_eff).total_seconds() / 3600
+                    # NORMAL DAY LOGIC
+                    # Rule 3: Lunch time (1:30 to 2:00)
+                    if t_in >= time(13, 30):
+                        t_start = time(14, 0)
+                        d_start = datetime.combine(datetime.today(), t_start)
+                        work_hrs = (d2 - d_start).total_seconds() / 3600
+                        day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
+                        status = "AB/"
+                    else:
+                        # Rule 1 & 2: Before or After 9:30
+                        t_start = max(t_in, time(9, 30))
+                        d_start = datetime.combine(datetime.today(), t_start)
+                        work_hrs = (d2 - d_start).total_seconds() / 3600
+                        
+                        # OT after 8.5 hours
+                        day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
+                        
+                        # Attendance Status
+                        if actual_duration < 4.0: status = "AB/"
+                        elif t_in > time(10, 16) or t_out < time(16, 0):
+                            if not sl_used and actual_duration >= 6.0: status, sl_used = "P*", True
+                            else: status = "AB/"
+                        else: status = "P"
 
-                    # Standard Attendance Logic
-                    if actual_hrs < 4.0: status = "AB/"
-                    elif t_in > time(10, 16) or t_out < time(16, 0) or (time(9,30)<t_in<=time(10,16) and actual_hrs < 8.5):
-                        if not sl_used and actual_hrs >= 6.0: status, sl_used = "P*", True
-                        else: status = "AB/"
+                    if status in ["P", "P*"]: p_c += 1
+                    elif status == "AB/": ab_c += 0.5
 
-                    # Normal OT calculation
-                    if "P" in status:
-                        day_ot = get_slab_ot(eff_hrs - 8.5) if eff_hrs > 8.5 else 0.0
-                    elif status == "AB/":
-                        day_ot = get_slab_ot(actual_hrs - 4.0) if actual_hrs > 4.0 else 0.0
-
-                if t_in > time(9, 35) and status not in ["H", "WO"]: late_log.append(f"({t_in.strftime('%H:%M')} - {d_i})")
-                if status in ["P", "P*"]: p_c += 1
-                elif status == "AB/": ab_c += 0.5
+                if t_in > time(9, 35) and not is_off_day: late_log.append(f"({t_in.strftime('%H:%M')} - {d_i})")
 
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
@@ -108,7 +114,7 @@ def run_hr_engine(df, holidays, corrections):
         row_m.update({"P": p_c, "A": a_c, "AB/": ab_c, "WO": wo_c, "H": h_c})
         row_o["Grand Total OT"] = tot_ot
         res_m.append(row_m); res_s.append({"ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "WO": wo_c, "H": h_c, "Total OT": tot_ot}); res_o.append(row_o)
-        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late In Detail": ", ".join(late_log), "Early Out Detail": ", ".join(early_log)})
+        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late In Detail": ", ".join(late_log)})
     
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
@@ -126,28 +132,26 @@ if not st.session_state.auth:
         u = st.text_input("User ID")
         p = st.text_input("Password", type="password")
         if st.button("Login"):
-            if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
+            if u == "admin" and p == "orange786": st.session_state.auth = True; st.rerun()
             else: st.error("Wrong Password!")
 else:
-    st.sidebar.title("🍊 Orange HR Report")
+    st.sidebar.title("🍊 Orange HR")
     file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
     if file: st.session_state.data = pd.read_excel(file)
-    st.session_state.hols = st.sidebar.multiselect("Select Holidays (Dates):", range(1, 32), default=st.session_state.hols)
-    
-    menu = st.sidebar.selectbox("Navigation", ["📊 1. Attendance Muster", "📈 2. Monthly Summary", "💰 3. OT Slab Report", "⚠️ 4. Late/Early Log", "❌ 5. Miss Punch List", "🛠️ 6. Punch Correction Panel"])
+    st.session_state.hols = st.sidebar.multiselect("Select Holidays:", range(1, 32), default=st.session_state.hols)
+    menu = st.sidebar.selectbox("Navigation", ["📊 1. Attendance Muster", "📈 2. Monthly Summary", "💰 3. OT Slab Report", "⚠️ 4. Late Log", "❌ 5. Miss Punch List", "🛠️ 6. Correction Panel"])
     
     if st.session_state.data is not None:
         m, s, o, ex, mi = run_hr_engine(st.session_state.data, st.session_state.hols, st.session_state.corrs)
         st.markdown("<h1 style='color: #f97316;'>Orange HR Report</h1>", unsafe_allow_html=True)
-        
         if menu == "📊 1. Attendance Muster": st.dataframe(m)
         elif menu == "📈 2. Monthly Summary": st.dataframe(s)
         elif menu == "💰 3. OT Slab Report": st.dataframe(o)
-        elif menu == "⚠️ 4. Late/Early Log": st.dataframe(ex)
+        elif menu == "⚠️ 4. Late Log": st.dataframe(ex)
         elif menu == "❌ 5. Miss Punch List": st.dataframe(mi)
-        elif menu == "🛠️ 6. Punch Correction Panel":
+        elif menu == "🛠️ 6. Correction Panel":
             with st.form("corr"):
                 c1, c2 = st.columns(2); cid = c1.text_input("Emp ID"); cdt = c2.number_input("Date", 1, 31)
-                cin = c1.text_input("Correct IN (HH:MM)"); cout = c2.text_input("Correct OUT (HH:MM)")
+                cin = c1.text_input("Correct IN"); cout = c2.text_input("Correct OUT")
                 if st.form_submit_button("Update"):
                     st.session_state.corrs.append({'id': cid, 'date': int(cdt), 'in': cin, 'out': cout}); st.success("Updated!")
