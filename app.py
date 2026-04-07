@@ -29,11 +29,11 @@ def run_hr_engine(df, holidays, corrections):
     if df is None or df.empty: return None, None, None, None, None
     df_w = df.copy()
     
-    # ID aur Name columns fix karein (Column 0 aur 1)
+    # ID aur Name columns (Col 0 and 1)
     id_c, name_c = df_w.columns[0], df_w.columns[1]
     df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
     
-    # Correction Apply karein
+    # Apply Corrections
     for c in corrections:
         mask = df_w[id_c].astype(str).str.contains(str(c['id']))
         if any(mask):
@@ -75,19 +75,18 @@ def run_hr_engine(df, holidays, corrections):
                 actual_dur = (d2 - d1).total_seconds() / 3600
 
                 if is_off_day:
-                    # WO/H pe pura OT
                     status = "WO" if d_i in sundays else "H"
                     day_ot = get_slab_ot(actual_dur)
                     if d_i in sundays: wo_c += 1 
                     else: h_c += 1
                 else:
-                    if t_in >= time(13, 30): # Rule 3: Afternoon
+                    if t_in >= time(13, 30): # Rule 3
                         t_start = time(14, 0)
                         d_start = datetime.combine(datetime.today(), t_start)
                         work_hrs = (d2 - d_start).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
-                    else: # Rule 1 & 2: Morning
+                    else: # Rule 1 & 2
                         t_start = max(t_in, time(9, 30))
                         d_start = datetime.combine(datetime.today(), t_start)
                         work_hrs = (d2 - d_start).total_seconds() / 3600
@@ -99,12 +98,8 @@ def run_hr_engine(df, holidays, corrections):
                             else: status = "AB/"
                         else: status = "P"
 
-                    # Late In Log (Working days only)
-                    if t_in > time(9, 35): 
-                        late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
-                    # Early Out Log (Working days only)
-                    if t_out < time(18, 0): 
-                        early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
+                    if t_in > time(9, 35): late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
+                    if t_out < time(18, 0): early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
@@ -113,20 +108,24 @@ def run_hr_engine(df, holidays, corrections):
             tot_ot += day_ot
 
         res_m.append(row_m)
+        # Summary Report with P, A, AB/, H, WO
         res_s.append({
-            "ID": clean_id, "Name": ename, "P": p_c, "Half(AB/)": ab_c, "A": a_c, 
-            "WO": wo_c, "H": h_c, "OT Hours": tot_ot, "Payable Days": (p_c + ab_c + wo_c + h_c)
+            "Emp ID": clean_id, "Name": ename, 
+            "Present (P)": p_c, "Absent (A)": a_c, 
+            "Half Day (AB/)": ab_c, "Holiday (H)": h_c, 
+            "Weekly Off (WO)": wo_c, "Total OT Hours": tot_ot,
+            "Payable Days": (p_c + ab_c + wo_c + h_c)
         })
+        
+        # OT Report with Grand Total
+        row_o["Total OT Hours"] = tot_ot
         res_o.append(row_o)
         
-        # --- LATE/EARLY FORMATTED REPORT ---
+        # Late/Early Log Report
         res_ex.append({
-            "Emp ID": clean_id, 
-            "Name": ename, 
-            "Late In Days": len(late_log), 
-            "Late Time & Date": " | ".join(late_log),
-            "Early Out Days": len(early_log), 
-            "Early Time & Date": " | ".join(early_log)
+            "Emp ID": clean_id, "Name": ename, 
+            "Late Days": len(late_log), "Late Time & Date": " | ".join(late_log),
+            "Early Days": len(early_log), "Early Time & Date": " | ".join(early_log)
         })
     
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
@@ -145,31 +144,27 @@ if not st.session_state.auth:
 else:
     st.sidebar.title("🍊 Orange HR")
     file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
-    hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
-    menu = st.sidebar.selectbox("Go to Report:", ["📊 Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
+    hols = st.sidebar.multiselect("Select Holidays (Dates):", range(1, 32))
+    menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
 
     if file:
         df_raw = pd.read_excel(file)
         m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
-
-        st.title(f"Orange HR - {menu}")
+        st.title(f"{menu}")
         
-        if menu == "📊 Muster": st.dataframe(m, use_container_width=True)
+        if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
         elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
         elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
         elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
         elif menu == "❌ Miss Punch": st.dataframe(mi, use_container_width=True)
         elif menu == "🛠️ Correction":
-            col1, col2 = st.columns(2)
-            with col1:
-                with st.form("corr_form"):
-                    st.subheader("Add Correction")
-                    cid = st.text_input("Emp ID"); dt = st.number_input("Date", 1, 31)
-                    cin = st.text_input("IN (HH:MM)"); cout = st.text_input("OUT (HH:MM)")
-                    if st.form_submit_button("Update"):
-                        st.session_state.corrs.append({'id': cid, 'date': int(cdt), 'in': cin, 'out': cout}); st.rerun()
-            with col2:
-                st.subheader("History")
-                st.write(st.session_state.corrs)
+            c1, c2 = st.columns(2)
+            with c1:
+                with st.form("corr"):
+                    eid = st.text_input("Emp ID"); dt = st.number_input("Date", 1, 31)
+                    cin = st.text_input("IN"); cout = st.text_input("OUT")
+                    if st.form_submit_button("Update Now"):
+                        st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
+            with c2: st.write("Correction List:", st.session_state.corrs)
     else:
-        st.info("Sidebar se Excel file upload karein.")
+        st.info("Sidebar se file upload karein.")
