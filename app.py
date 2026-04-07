@@ -29,11 +29,9 @@ def run_hr_engine(df, holidays, corrections):
     if df is None or df.empty: return None, None, None, None, None
     df_w = df.copy()
     
-    # ID aur Name columns (Col 0 and 1)
     id_c, name_c = df_w.columns[0], df_w.columns[1]
     df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
     
-    # Apply Corrections
     for c in corrections:
         mask = df_w[id_c].astype(str).str.contains(str(c['id']))
         if any(mask):
@@ -80,27 +78,38 @@ def run_hr_engine(df, holidays, corrections):
                     if d_i in sundays: wo_c += 1 
                     else: h_c += 1
                 else:
-                    if t_in >= time(13, 30): # Rule 3
+                    # RULE 3: 1:30 PM Entry
+                    if t_in >= time(13, 30):
                         t_start = time(14, 0)
                         d_start = datetime.combine(datetime.today(), t_start)
                         work_hrs = (d2 - d_start).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
-                    else: # Rule 1 & 2
-                        t_start = max(t_in, time(9, 30))
-                        d_start = datetime.combine(datetime.today(), t_start)
-                        work_hrs = (d2 - d_start).total_seconds() / 3600
+                        # Early out if worked less than 4 hours for half day
+                        if work_hrs < 4.0:
+                            early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
+                    else:
+                        # RULE 1 & 2: Morning
+                        t_start_calc = max(t_in, time(9, 30))
+                        d_start_calc = datetime.combine(datetime.today(), t_start_calc)
+                        work_hrs = (d2 - d_start_calc).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
                         
+                        # Attendance Logic
                         if actual_dur < 4.0: status = "AB/"
                         elif t_in > time(10, 16) or t_out < time(16, 0):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
 
-                    if t_in > time(9, 35): late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
-                    if t_out < time(18, 0): early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
-                    
+                        # Late In Log
+                        if t_in > time(9, 35): 
+                            late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
+                        
+                        # NEW EARLY OUT LOG: Only if 8.5 hours not completed
+                        if work_hrs < 8.5:
+                            early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
+
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
 
@@ -108,24 +117,18 @@ def run_hr_engine(df, holidays, corrections):
             tot_ot += day_ot
 
         res_m.append(row_m)
-        # Summary Report with P, A, AB/, H, WO
         res_s.append({
             "Emp ID": clean_id, "Name": ename, 
-            "Present (P)": p_c, "Absent (A)": a_c, 
-            "Half Day (AB/)": ab_c, "Holiday (H)": h_c, 
-            "Weekly Off (WO)": wo_c, "Total OT Hours": tot_ot,
-            "Payable Days": (p_c + ab_c + wo_c + h_c)
+            "Present (P)": p_c, "Absent (A)": a_c, "Half Day (AB/)": ab_c, 
+            "Holiday (H)": h_c, "Weekly Off (WO)": wo_c, 
+            "Total OT Hours": tot_ot, "Payable Days": (p_c + ab_c + wo_c + h_c)
         })
-        
-        # OT Report with Grand Total
         row_o["Total OT Hours"] = tot_ot
         res_o.append(row_o)
-        
-        # Late/Early Log Report
         res_ex.append({
             "Emp ID": clean_id, "Name": ename, 
-            "Late Days": len(late_log), "Late Time & Date": " | ".join(late_log),
-            "Early Days": len(early_log), "Early Time & Date": " | ".join(early_log)
+            "Late Days": len(late_log), "Late In Detail": " | ".join(late_log),
+            "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
         })
     
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
@@ -143,8 +146,8 @@ if not st.session_state.auth:
         else: st.error("Wrong Password!")
 else:
     st.sidebar.title("🍊 Orange HR")
-    file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
-    hols = st.sidebar.multiselect("Select Holidays (Dates):", range(1, 32))
+    file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
+    hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
     menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
 
     if file:
@@ -163,8 +166,8 @@ else:
                 with st.form("corr"):
                     eid = st.text_input("Emp ID"); dt = st.number_input("Date", 1, 31)
                     cin = st.text_input("IN"); cout = st.text_input("OUT")
-                    if st.form_submit_button("Update Now"):
+                    if st.form_submit_button("Update"):
                         st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
-            with c2: st.write("Correction List:", st.session_state.corrs)
+            with c2: st.write("History:", st.session_state.corrs)
     else:
         st.info("Sidebar se file upload karein.")
