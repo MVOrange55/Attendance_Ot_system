@@ -137,4 +137,3 @@ else:
         elif menu == "💰 3. OT Slab Report": st.dataframe(o)
         elif menu == "⚠️ 4. Late/Early Log": st.dataframe(ex)
         elif menu == "❌ 5. Miss Punch List": st.dataframe(mi)
-            
