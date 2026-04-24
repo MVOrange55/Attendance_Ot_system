@@ -18,10 +18,10 @@ def get_slab_ot(extra_hrs):
     if extra_hrs < 0.25: return 0.0
     h = int(extra_hrs)
     m = round((extra_hrs - h) * 60)
-    if 15 <= m < 30: slab = 0.25
-    elif 30 <= m < 45: slab = 0.50
-    elif 45 <= m < 60: slab = 0.75
-    elif m >= 60: h += 1; slab = 0.0
+    if 15 <= m < 25: slab = 0.00
+    elif 28 <= m < 40: slab = 0.50
+    elif 43 <= m < 55: slab = 0.75
+    elif 56 <= m < 60: slab = 1.0
     else: slab = 0.0
     return float(h + slab)
 
