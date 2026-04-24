@@ -22,6 +22,7 @@ def get_slab_ot(extra_hrs):
     elif 28 <= m < 40: slab = 0.50
     elif 43 <= m < 55: slab = 0.75
     elif 56 <= m < 60: slab = 1.0
+    else >= 60: h += 1; slab = 0.0
     else: slab = 0.0
     return float(h + slab)
 
