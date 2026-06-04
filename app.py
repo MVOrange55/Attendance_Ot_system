@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
-from fpdf import FPDF
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
@@ -11,18 +10,13 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. HELPER FUNCTIONS ---
-def generate_pdf(df):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, txt="Employee Directory Report", ln=True, align='C')
-    pdf.set_font("Arial", size=10)
-    for _, row in df.iterrows():
-        pdf.cell(200, 10, txt=f"ID: {row.get('ID')} | Name: {row.get('Name')} | Dept: {row.get('Dept')}", ln=True)
-    return pdf.output(dest='S').encode('latin-1')
+# --- 3. HELPER FUNCTION ---
+def get_pdf_download_link(df):
+    # HTML table convert karke download button dete hain
+    html = df.to_html(index=False)
+    return html
 
-# --- 4. ENGINE FUNCTIONS (UNCHANGED) ---
+# --- 4. ENGINE FUNCTIONS (ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -140,18 +134,11 @@ else:
         with t1:
             with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                # Form fields with validation logic
                 data = {
-                    "ID": c1.text_input("ID"),
-                    "Name": c1.text_input("Name"),
-                    "Gender": c1.selectbox("Gender", ["Male", "Female"]),
-                    "DOB": str(c1.date_input("DOB")),
-                    "DOJ": str(c1.date_input("DOJ")),
-                    "Dept": c2.text_input("Dept"),
-                    "Contact": c1.text_input("Contact Number (Max 10)", max_chars=10),
-                    "PF": c2.text_input("PF (Max 12)", max_chars=12),
-                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12),
-                    "Status": c2.selectbox("Status", ["Active", "Inactive"], index=0),
+                    "ID": c1.text_input("ID"), "Name": c1.text_input("Name"), "Gender": c1.selectbox("Gender", ["Male", "Female"]),
+                    "DOB": str(c1.date_input("DOB")), "DOJ": str(c1.date_input("DOJ")), "Dept": c2.text_input("Dept"),
+                    "Contact": c1.text_input("Contact (Max 10)", max_chars=10), "PF": c2.text_input("PF (Max 12)", max_chars=12),
+                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), "Status": c2.selectbox("Status", ["Active", "Inactive"]),
                     "Designation": c2.text_input("Designation"), "Manager": c2.text_input("Manager"), "FatherName": c1.text_input("FatherName"), 
                     "Email": c2.text_input("Email"), "Address": c2.text_area("Address"), "EmergencyName": c1.text_input("EmergencyName"), 
                     "EmergencyContact": c1.text_input("EmergencyContact"), "ESIC": c2.text_input("ESIC"), "Qualification": c1.text_input("Qualification"), 
@@ -178,4 +165,5 @@ else:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
-                st.download_button("📥 PDF Export", generate_pdf(df), "Report.pdf")
+                # PDF ka link (Browser me open karke Print -> Save as PDF kar lo)
+                st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
