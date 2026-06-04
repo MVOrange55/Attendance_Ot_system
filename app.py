@@ -6,7 +6,7 @@ import io
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
 
-# --- 2. ENGINE FUNCTIONS (ORIGINAL - NO CHANGES) ---
+# --- 2. ENGINE FUNCTIONS ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -139,27 +139,18 @@ def to_excel(df):
 def to_html_for_pdf(df):
     time_str = datetime.today().strftime('%Y-%m-%d %H:%M')
     html_table = df.to_html(index=False)
-    html = """
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px; }
-            th, td { border: 1px solid #dddddd; text-align: left; padding: 6px; white-space: nowrap; }
-            th { background-color: #f97316; color: white; font-weight: bold; }
-            h2 { color: #f97316; font-family: Arial, sans-serif; }
-        </style>
-    </head>
-    <body>
-        <h2>Orange House - Employee Profile Directory</h2>
-        <p>Generated on: """ + time_str + """</p>
-        <div style="overflow-x: auto;">
-            """ + html_table + """
-        </div>
-    </body>
-    </html>
-    """
-    return html
+    
+    html_start = """<html><head><meta charset="utf-8"><style>
+    table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px; }
+    th, td { border: 1px solid #dddddd; text-align: left; padding: 6px; white-space: nowrap; }
+    th { background-color: #f97316; color: white; font-weight: bold; }
+    h2 { color: #f97316; font-family: Arial, sans-serif; }
+    </style></head><body><h2>Orange House - Employee Profile Directory</h2>"""
+    
+    html_mid = "<p>Generated on: " + time_str + "</p><div style='overflow-x: auto;'>" + html_table + "</div>"
+    html_end = "</body></html>"
+    
+    return html_start + html_mid + html_end
 
 # --- 3. SESSION STATES ---
 if 'auth' not in st.session_state: st.session_state.auth = False
@@ -192,7 +183,7 @@ else:
         if file:
             df_raw = pd.read_excel(file)
             m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
-            st.subheader(f"{menu}")
+            st.subheader(menu)
             
             if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
             elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
@@ -218,7 +209,6 @@ else:
     # --- SECTION B: EMPLOYEE PROFILE DIRECTORY ---
     else:
         st.title("👤 Advanced Employee Profile Directory")
-        
         tab1, tab2, tab3 = st.tabs(["➕ Add Profile (Manual)", "📤 Import / Upload CSV File", "📋 View & Manage Directory"])
         
         # --- TAB 1: MANUAL ENTRY ---
@@ -286,7 +276,7 @@ else:
                         if exists:
                             st.error(f"Employee ID {p_id} pehle se registered hai!")
                         else:
-                            st.session_state.profiles.append({
+                            new_profile = {
                                 'Employee ID': p_id.strip(), 'Full Name': p_name.strip(), 'Photo': p_photo.name if p_photo else 'No Photo',
                                 'Gender': p_gender, 'Date of Birth': p_dob.strftime('%Y-%m-%d'), 'Contact Number': p_contact.strip(),
                                 'Email ID': p_email.strip(), 'Address': p_address.strip().replace('\n', ' '), 'Emergency Contact': p_emergency.strip(),
@@ -296,24 +286,22 @@ else:
                                 'PF/ESI Information': p_pf.strip().replace('\n', ' '), 'Attendance Record': "Linked", 'Leave Balance': p_leave.strip(),
                                 'Performance Details': p_perf.strip().replace('\n', ' '), 'Skills & Qualifications': p_skills.strip().replace('\n', ' '),
                                 'Experience': p_exp.strip(), 'Documents Upload': 'Uploaded' if p_docs else 'No Documents', 'Status': p_status
-                            })
+                            }
+                            st.session_state.profiles.append(new_profile)
                             st.success(f"{p_name} ka profile save ho gaya!")
                             st.rerun()
 
         # --- TAB 2: BULK CSV UPLOAD / IMPORT ---
         with tab2:
             st.subheader("Bulk Import Employee Master File")
-            st.markdown("""
-            **⚠️ Rule:** Aapki CSV/Excel file mein exact wahi headers hone chahiye jo system match karega. 
-            Aap testing ke liye niche diye gaye button se **Sample Format Template** download kar sakte hain.
-            """)
+            st.markdown("Suggested template can be downloaded below.")
             
             template_cols = ['Employee ID', 'Full Name', 'Photo', 'Gender', 'Date of Birth', 'Contact Number', 'Email ID', 'Address', 'Emergency Contact', 'Department', 'Designation', 'Reporting Manager', 'Date of Joining', 'Employment Type', 'Work Location', 'Shift Details', 'Salary Details', 'Bank Account Details', 'PF/ESI Information', 'Attendance Record', 'Leave Balance', 'Performance Details', 'Skills & Qualifications', 'Experience', 'Documents Upload', 'Status']
             template_df = pd.DataFrame(columns=template_cols)
             st.download_button(label="📥 Download Sample CSV Template", data=template_df.to_csv(index=False), file_name="Employee_Import_Template.csv", mime="text/csv")
             
             st.write("---")
-            uploaded_master = st.file_uploader("Apni HR CSV ya Excel File Select Karein:", type=['csv', 'xlsx'], key="bulk_profile_uploader")
+            uploaded_master = st.file_uploader("Select HR CSV/Excel file:", type=['csv', 'xlsx'], key="bulk_profile_uploader")
             
             if uploaded_master:
                 try:
@@ -322,7 +310,7 @@ else:
                     else:
                         uploaded_df = pd.read_excel(uploaded_master)
                     
-                    st.write("File Preview (Top 5 rows):", uploaded_df.head())
+                    st.write("File Preview:", uploaded_df.head())
                     
                     if st.button("Confirm & Import All Data", type="primary"):
                         success_count = 0
@@ -334,7 +322,6 @@ else:
                                 continue
                             
                             emp_id = str(raw_id).strip().split('.')[0]
-                            
                             exists = any(str(p['Employee ID']) == emp_id for p in st.session_state.profiles)
                             if exists:
                                 duplicate_count += 1
@@ -344,7 +331,7 @@ else:
                                 if pd.isna(val): return default
                                 return str(val).strip()
 
-                            st.session_state.profiles.append({
+                            bulk_item = {
                                 'Employee ID': emp_id,
                                 'Full Name': clean_val(row.get('Full Name'), 'Unnamed'),
                                 'Photo': clean_val(row.get('Photo'), 'No Photo'),
@@ -368,4 +355,8 @@ else:
                                 'Leave Balance': clean_val(row.get('Leave Balance')),
                                 'Performance Details': clean_val(row.get('Performance Details')).replace('\n', ' '),
                                 'Skills & Qualifications': clean_val(row.get('Skills & Qualifications')).replace('\n', ' '),
-                                'Experience': clean_va
+                                'Experience': clean_val(row.get('Experience')),
+                                'Documents Upload': clean_val(row.get('Documents Upload'), 'No Documents'),
+                                'Status': clean_val(row.get('Status'), 'Active')
+                            }
+                            st.session_state.profiles.append(bulk_item
