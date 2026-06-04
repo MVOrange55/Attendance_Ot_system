@@ -7,84 +7,117 @@ st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon
 
 # --- 2. SESSION STATES ---
 if 'auth' not in st.session_state: st.session_state.auth = False
-if 'profiles' not in st.session_state: st.session_state.profiles = []
 if 'corrs' not in st.session_state: st.session_state.corrs = []
+if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. LOGIN ---
+# --- 3. ATTENDANCE ENGINE (ORIGINAL) ---
+def parse_t(v):
+    if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
+    try:
+        s = str(v).strip()
+        if ':' in s: return datetime.strptime(s[:5], '%H:%M').time()
+        return (datetime(1900, 1, 1) + timedelta(days=float(s))).time()
+    except: return None
+
+def get_slab_ot(extra_hrs):
+    if extra_hrs < 0.25: return 0.0
+    h = int(extra_hrs)
+    m = round((extra_hrs - h) * 60)
+    if 15 <= m < 27: slab = 0.00
+    elif 29 <= m < 43: slab = 0.50
+    elif 44 <= m < 57: slab = 0.75
+    elif 59 <= m < 60: slab = 1.0
+    elif m >= 60: h += 1; slab = 0.0
+    else: slab = 0.0
+    return float(h + slab)
+
+def run_hr_engine(df, holidays, corrections):
+    if df is None or df.empty: return None, None, None, None, None
+    df_w = df.copy()
+    id_c, name_c = df_w.columns[0], df_w.columns[1]
+    df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
+    for c in corrections:
+        mask = df_w[id_c].astype(str).str.contains(str(c['id']))
+        if any(mask):
+            idx = df_w[mask].index[0]
+            df_w.at[idx+1, str(c['date'])] = c['in']
+            df_w.at[idx+2, str(c['date'])] = c['out']
+    dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
+    res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
+    for eid in df_w[id_c].unique():
+        if pd.isna(eid): continue
+        clean_id = str(int(float(eid))) if '.' in str(eid) else str(eid).replace(':', '')
+        block = df_w[df_w[id_c] == eid].reset_index(drop=True)
+        ename = str(block.iloc[0][name_c])
+        row_m, row_o = {"ID": clean_id, "Name": ename}, {"ID": clean_id, "Name": ename}
+        p_c, a_c, ab_c, wo_c, h_c, tot_ot = 0, 0, 0, 0, 0, 0.0
+        for d in dates:
+            d_i = int(float(d))
+            t_in, t_out = parse_t(block.iloc[1][d]), parse_t(block.iloc[2][d])
+            status, day_ot = "A", 0.0
+            if not t_in and not t_out:
+                status = "A"; a_c += 1
+            else:
+                d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
+                if d2 <= d1: d2 += timedelta(days=1)
+                work_hrs = (d2 - datetime.combine(datetime.today(), max(t_in, time(9, 30)))).total_seconds() / 3600
+                day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
+                status = "P" if work_hrs >= 4.0 else "AB/"
+                if status == "P": p_c += 1
+                elif status == "AB/": ab_c += 0.5
+            row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
+            tot_ot += day_ot
+        res_m.append(row_m)
+        res_s.append({"Emp ID": clean_id, "Name": ename, "Present": p_c, "Absent": a_c, "Payable": (p_c + ab_c)})
+        res_o.append({**row_o, "Total OT": tot_ot})
+    return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
+
+# --- 4. UI ---
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
-    u = st.text_input("User ID")
-    p = st.text_input("Password", type="password")
+    u = st.text_input("User ID"); p = st.text_input("Password", type="password")
     if st.button("Login"):
         if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
         else: st.error("Wrong Password!")
 else:
-    # --- NAVIGATION ---
     mode = st.sidebar.radio("Navigation:", ["📊 Attendance Portal", "👤 Employee Directory"])
     
-    # ========================================================
-    # MODULE 1: OLD ATTENDANCE CODE (SAME AS BEFORE)
-    # ========================================================
     if mode == "📊 Attendance Portal":
-        st.title("Attendance Management")
-        # [Yahan aapka purana attendance logic rahega]
-        st.info("Attendance Portal is active.")
-
-    # ========================================================
-    # MODULE 2: NEW EMPLOYEE DIRECTORY (ALAG SE)
-    # ========================================================
+        file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
+        hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
+        menu = st.sidebar.selectbox("Reports Menu:", ["Muster", "Summary", "Correction"])
+        if file:
+            m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
+            if menu == "Muster": st.dataframe(m)
+            elif menu == "Summary": st.dataframe(s)
+            elif menu == "Correction":
+                with st.form("corr"):
+                    eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31)
+                    if st.form_submit_button("Add"): st.session_state.corrs.append({'id': eid, 'date': int(dt)})
+    
     elif mode == "👤 Employee Directory":
-        st.title("👤 Employee Profile Directory")
         t1, t2, t3 = st.tabs(["➕ Add Profile", "📋 Directory / Delete", "📤 Export"])
-        
         with t1:
             with st.form("emp_form", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 with c1:
-                    e_id = st.text_input("Employee ID *")
-                    e_name = st.text_input("Full Name *")
-                    e_gen = st.selectbox("Gender", ["Male", "Female", "Other"])
-                    e_dob = st.date_input("Date of Birth *")
-                    e_doj = st.date_input("Date of Joining *")
-                    e_dept = st.text_input("Department")
-                    e_desig = st.text_input("Designation")
-                    e_mgr = st.text_input("Reporting Manager")
-                    e_fat = st.text_input("Father's Name")
-                    e_cont = st.text_input("Contact Number *")
-                    e_email = st.text_input("Email ID")
-                    e_addr = st.text_area("Address")
+                    eid = st.text_input("Employee ID *"); ename = st.text_input("Full Name *"); econt = st.text_input("Contact *")
+                    dob = st.date_input("Date of Birth *"); doj = st.date_input("Date of Joining *")
+                    photo = st.file_uploader("Photo Upload", type=['jpg', 'png'])
                 with c2:
-                    e_emg = st.text_input("Emergency Contact Person Name")
-                    e_emg_n = st.text_input("Emergency Contact")
-                    e_esic = st.text_input("ESIC")
-                    e_pf = st.text_input("PF")
-                    e_qual = st.text_input("Qualifications")
-                    e_exp = st.text_input("Experience")
-                    e_aad = st.text_input("Aadhaar")
-                    e_pan = st.text_input("PAN")
-                    e_stat = st.selectbox("Status", ["Active", "Inactive"])
-                    e_mar = st.selectbox("Marital Status", ["Single", "Married"])
-                    e_nat = st.text_input("Nationality")
-                    e_bg = st.selectbox("Blood Group", ["A+", "A-", "B+", "B-", "O+", "O-"])
-                    e_pic = st.file_uploader("Photo Upload", type=['jpg', 'png'])
-                    e_res = st.file_uploader("Resume Upload", type=['pdf'])
-                
-                if st.form_submit_button("Save Employee Profile"):
-                    if e_id and e_name and e_cont:
-                        st.session_state.profiles.append({"ID": e_id, "Name": e_name, "Contact": e_cont, "Dept": e_dept, "Status": e_stat})
-                        st.success("Profile Added!"); st.rerun()
-                    else: st.error("Please fill mandatory fields (*)")
-
+                    edept = st.text_input("Department"); esic = st.text_input("ESIC"); epf = st.text_input("PF")
+                    epan = st.text_input("PAN"); resume = st.file_uploader("Resume Upload", type=['pdf'])
+                if st.form_submit_button("Save Profile"):
+                    st.session_state.profiles.append({"ID": eid, "Name": ename, "Dept": edept, "Contact": econt})
+                    st.success("Saved!"); st.rerun()
         with t2:
             if st.session_state.profiles:
-                df = pd.DataFrame(st.session_state.profiles)
-                st.dataframe(df)
-                del_id = st.selectbox("Select ID to Delete:", df["ID"].unique())
-                if st.button("Delete Selected Employee"):
+                df_p = pd.DataFrame(st.session_state.profiles)
+                st.dataframe(df_p)
+                del_id = st.selectbox("Select ID to Delete:", df_p["ID"].unique())
+                if st.button("Delete Selected"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if p["ID"] != del_id]
-                    st.warning("Deleted successfully!"); st.rerun()
-            else: st.info("No profiles found.")
-
+                    st.rerun()
         with t3:
             if st.session_state.profiles:
-                st.download_button("Download CSV", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Directory.csv")
+                st.download_button("Excel", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Dir.csv")
