@@ -80,7 +80,6 @@ def run_hr_engine(df, holidays, corrections):
                     if d_i in sundays: wo_c += 1 
                     else: h_c += 1
                 else:
-                    # RULE 3: 1:30 PM Entry
                     if t_in >= time(13, 30):
                         t_start = time(14, 0)
                         d_start = datetime.combine(datetime.today(), t_start)
@@ -90,24 +89,20 @@ def run_hr_engine(df, holidays, corrections):
                         if work_hrs < 4.0:
                             early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     else:
-                        # RULE 1 & 2: Morning
                         t_start_calc = max(t_in, time(9, 30))
                         d_start_calc = datetime.combine(datetime.today(), t_start_calc)
                         work_hrs = (d2 - d_start_calc).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
                         
-                        # Attendance Logic
                         if actual_dur < 4.0: status = "AB/"
                         elif t_in > time(10, 16) or t_out < time(16, 0):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
 
-                        # Late In Log
                         if t_in > time(9, 35): 
                             late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
                         
-                        # Early out log (If 8.5 hours not completed)
                         if work_hrs < 8.5:
                             early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
 
@@ -134,7 +129,7 @@ def run_hr_engine(df, holidays, corrections):
     
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- NEW HELPER FUNCTIONS FOR PROFILE EXPORT ---
+# --- CSV STRUCTURE HELPER FUNCTIONS ---
 def to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -179,25 +174,28 @@ if not st.session_state.auth:
 else:
     st.sidebar.title("🍊 Orange HR")
     
-    menu = st.sidebar.selectbox("Reports Menu:", [
-        "📊 Attendance Muster", 
-        "📈 Summary Report", 
-        "💰 OT Slab Report", 
-        "⚠️ Late/Early Log", 
-        "❌ Miss Punch", 
-        "🛠️ Correction",
-        "👤 Employee Profile"
-    ])
+    # Do alag main sections: 1) Attendance Reports, 2) Employee Profile Directory
+    app_mode = st.sidebar.radio("Navigation:", ["📊 Attendance Dashboard", "👤 Employee Profile Directory"])
     
-    # Conditional checks taaki Employee Profile screen par unnecessary uploaders show na hon
-    if menu != "👤 Employee Profile":
+    # --- SECTION A: ATTENDANCE DASHBOARD ---
+    if app_mode == "📊 Attendance Dashboard":
+        st.title("🍊 Attendance Management Dashboard")
+        menu = st.sidebar.selectbox("Reports Menu:", [
+            "📊 Attendance Muster", 
+            "📈 Summary Report", 
+            "💰 OT Slab Report", 
+            "⚠️ Late/Early Log", 
+            "❌ Miss Punch", 
+            "🛠️ Correction"
+        ])
+        
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
 
         if file:
             df_raw = pd.read_excel(file)
             m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
-            st.title(f"{menu}")
+            st.subheader(f"{menu}")
             
             if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
             elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
@@ -214,19 +212,19 @@ else:
                             st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
                 with c2: st.write("History:", st.session_state.corrs)
         else:
-            st.info("Sidebar se file upload karein.")
+            st.info("Sidebar se attendance Excel file upload karein.")
 
-    # --- NEW EXTENDED FEATURES: EMPLOYEE PROFILE AREA WITH FILTER & DOWNLOADS ---
+    # --- SECTION B: EMPLOYEE PROFILE DIRECTORY (COMPLETELY ISOLATED) ---
     else:
         st.title("👤 Advanced Employee Profile Directory")
         
         tab1, tab2 = st.tabs(["➕ Add Detailed Profile", "📋 View & Manage Directory"])
         
         with tab1:
-            st.subheader("Enter Complete Employee Onboarding Details")
+            st.subheader("Enter Standard Employee Database Details")
             with st.form("extended_profile_form", clear_on_submit=True):
                 
-                # SECTION 1: Personal Details
+                # IMPORTANT CSV COLUMN STRUCTURE FIELDS
                 st.markdown("### 📝 Personal Details")
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -243,8 +241,6 @@ else:
                     p_address = st.text_area("Address", height=68)
 
                 st.markdown("---")
-                
-                # SECTION 2: Employment & Work Details
                 st.markdown("### 🏢 Employment & Work Details")
                 col4, col5, col6 = st.columns(3)
                 with col4:
@@ -261,8 +257,6 @@ else:
                     p_exp = st.text_input("Total Experience (Years)")
 
                 st.markdown("---")
-                
-                # SECTION 3: Financial & Statutory Details
                 st.markdown("### 💰 Financial & Statutory Details")
                 col7, col8 = st.columns(2)
                 with col7:
@@ -274,56 +268,52 @@ else:
                     p_pan = st.text_input("PAN Card Number")
 
                 st.markdown("---")
-                
-                # SECTION 4: HR Metrics & Documents
                 st.markdown("### 📊 HR Metrics & Documents")
                 col9, col10 = st.columns(2)
                 with col9:
                     p_skills = st.text_area("Skills & Qualifications")
                     p_perf = st.text_area("Performance Details / Remarks")
                 with col10:
-                    p_leave = st.text_input("Initial Leave Balance (e.g., CL: 12, SL: 8)")
-                    p_docs = st.file_uploader("Upload Documents (Resume, Certificates)", type=['pdf', 'docx', 'zip'], accept_multiple_files=True)
+                    p_leave = st.text_input("Initial Leave Balance")
+                    p_docs = st.file_uploader("Upload Documents (Resume/Certificates)", type=['pdf', 'docx', 'zip'], accept_multiple_files=True)
 
                 submit_profile = st.form_submit_button("Save Complete Profile")
                 if submit_profile:
                     if p_id.strip() == "" or p_name.strip() == "":
                         st.error("Employee ID aur Name mandatory hain!")
                     else:
-                        exists = any(p['id'] == p_id.strip() for p in st.session_state.profiles)
+                        exists = any(p['Employee ID'] == p_id.strip() for p in st.session_state.profiles)
                         if exists:
                             st.error(f"Employee ID {p_id} pehle se registered hai!")
                         else:
-                            # Aadhaar digits masking for privacy standards
-                            masked_aadhaar = f"XXXX-XXXX-{p_aadhaar[-4:]}" if len(p_aadhaar.strip()) >= 4 else "[Aadhaar Redacted]"
-                            
+                            # Strict CSV Structured Schema Alignment
                             st.session_state.profiles.append({
-                                'id': p_id.strip(),
-                                'name': p_name.strip(),
-                                'dob': p_dob.strftime('%Y-%m-%d'),
-                                'gender': p_gender,
-                                'contact': p_contact.strip(),
-                                'email': p_email.strip(),
-                                'emergency': p_emergency.strip(),
-                                'address': p_address.strip(),
-                                'department': p_dept.strip(),
-                                'designation': p_desig.strip(),
-                                'manager': p_manager.strip(),
-                                'doj': p_doj.strftime('%Y-%m-%d'),
-                                'type': p_type,
-                                'status': p_status,
-                                'location': p_location.strip(),
-                                'shift': p_shift.strip(),
-                                'experience': p_exp.strip(),
-                                'salary': p_salary.strip(),
-                                'bank': p_bank.strip(),
-                                'pf_esi': p_pf.strip(),
-                                'aadhaar': masked_aadhaar,
-                                'pan': p_pan.strip().upper(),
-                                'skills': p_skills.strip(),
-                                'performance': p_perf.strip(),
-                                'leaves': p_leave.strip(),
-                                'attendance': "Linked with Attendance Muster"
+                                'Employee ID': p_id.strip(),
+                                'Full Name': p_name.strip(),
+                                'Photo': p_photo.name if p_photo else 'No Photo Uploaded',
+                                'Gender': p_gender,
+                                'Date of Birth': p_dob.strftime('%Y-%m-%d'),
+                                'Contact Number': p_contact.strip(),
+                                'Email ID': p_email.strip(),
+                                'Address': p_address.strip().replace('\n', ' '),
+                                'Emergency Contact': p_emergency.strip(),
+                                'Department': p_dept.strip(),
+                                'Designation': p_desig.strip(),
+                                'Reporting Manager': p_manager.strip(),
+                                'Date of Joining': p_doj.strftime('%Y-%m-%d'),
+                                'Employment Type': p_type,
+                                'Work Location': p_location.strip(),
+                                'Shift Details': p_shift.strip(),
+                                'Salary Details': p_salary.strip(),
+                                'Bank Account Details': p_bank.strip().replace('\n', ' '),
+                                'PF/ESI Information': p_pf.strip().replace('\n', ' '),
+                                'Attendance Record': "Linked",
+                                'Leave Balance': p_leave.strip(),
+                                'Performance Details': p_perf.strip().replace('\n', ' '),
+                                'Skills & Qualifications': p_skills.strip().replace('\n', ' '),
+                                'Experience': p_exp.strip(),
+                                'Documents Upload': 'Uploaded' if p_docs else 'No Documents',
+                                'Status': p_status
                             })
                             st.success(f"{p_name} ka profile detailed database mein save ho gaya!")
                             st.rerun()
@@ -333,18 +323,8 @@ else:
             if len(st.session_state.profiles) == 0:
                 st.info("Abhi koi profiles saved nahi hain.")
             else:
-                prof_df = pd.DataFrame(st.session_state.profiles)
-                display_df = prof_df.rename(columns={
-                    'id': 'Employee ID', 'name': 'Full Name', 'dob': 'Date of Birth',
-                    'gender': 'Gender', 'contact': 'Contact Number', 'email': 'Email ID',
-                    'emergency': 'Emergency Contact', 'address': 'Address', 'department': 'Department',
-                    'designation': 'Designation', 'manager': 'Reporting Manager', 'doj': 'Date of Joining',
-                    'type': 'Employment Type', 'status': 'Status', 'location': 'Work Location',
-                    'shift': 'Shift Details', 'experience': 'Experience (Yrs)', 'salary': 'Salary Details',
-                    'bank': 'Bank Account', 'pf_esi': 'PF/ESI Info', 'aadhaar': 'Aadhaar (Masked)',
-                    'pan': 'PAN Card', 'skills': 'Skills', 'performance': 'Performance',
-                    'leaves': 'Leave Balance', 'attendance': 'Attendance Status'
-                })
+                # Direct conversion to clean structured DataFrame
+                display_df = pd.DataFrame(st.session_state.profiles)
                 
                 # --- FILTERS SYSTEM ---
                 st.markdown("#### 🔍 Filter Employees")
@@ -360,7 +340,7 @@ else:
                 with f_col4:
                     search_status = st.selectbox("Filter by Status:", ["All", "Active", "Inactive"])
                 
-                # Applying filters dynamically in real time
+                # Dynamic filtering
                 filtered_df = display_df.copy()
                 if search_id:
                     filtered_df = filtered_df[filtered_df['Employee ID'].astype(str).str.contains(search_id, case=False)]
@@ -371,27 +351,38 @@ else:
                 if search_status != "All":
                     filtered_df = filtered_df[filtered_df['Status'] == search_status]
                 
-                # Interactive Table View
+                # Show CSV Structure DataFrame
                 st.dataframe(filtered_df, use_container_width=True)
                 
-                # --- EXPORT DOWNLOAD BUTTONS ---
+                # --- EXPORT DOWNLOAD SYSTEM ---
                 st.write("")
                 st.markdown("#### 📥 Export / Download Filtered Directory")
-                down_col1, down_col2, _ = st.columns([1, 1, 4])
+                down_col1, down_col2, down_col3, _ = st.columns([1, 1, 1, 3])
                 
                 with down_col1:
+                    # Pure CSV Data Download
+                    csv_buffer = io.StringIO()
+                    filtered_df.to_csv(csv_buffer, index=False)
+                    st.download_button(
+                        label="Download CSV 📄",
+                        data=csv_buffer.getvalue(),
+                        file_name=f"Employee_Database_{datetime.today().strftime('%Y-%m-%d')}.csv",
+                        mime="text/csv"
+                    )
+                
+                with down_col2:
                     excel_data = to_excel(filtered_df)
                     st.download_button(
-                        label="Excel Download 📈",
+                        label="Download Excel 📈",
                         data=excel_data,
                         file_name=f"Employee_Directory_{datetime.today().strftime('%Y-%m-%d')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 
-                with down_col2:
+                with down_col3:
                     html_data = to_html_for_pdf(filtered_df)
                     st.download_button(
-                        label="PDF Print/Download 📄",
+                        label="Download PDF Print 📄",
                         data=html_data,
                         file_name=f"Employee_Directory_{datetime.today().strftime('%Y-%m-%d')}.html",
                         mime="text/html"
@@ -401,5 +392,11 @@ else:
                 st.write("---")
                 st.subheader("❌ Delete Employee Profile")
                 
-                delete_options = [f"{p['id']} - {p['name']}" for p in st.session_state.profiles]
+                delete_options = [f"{p['Employee ID']} - {p['Full Name']}" for p in st.session_state.profiles]
                 selected_to_delete = st.selectbox("Kisko directory se delete karna hai select karein:", delete_options)
+                
+                if st.button("Delete Selected Profile", type="primary"):
+                    target_id = selected_to_delete.split(" - ")[0]
+                    st.session_state.profiles = [p for p in st.session_state.profiles if p['Employee ID'] != target_id]
+                    st.success(f"Profile {selected_to_delete} deleted successfully!")
+                    st.rerun()
