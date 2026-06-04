@@ -28,9 +28,10 @@ def get_slab_ot(extra_hrs):
     return float(h + slab)
 
 def run_hr_engine(df, holidays, corrections):
-    if df is None or df.empty: return None, None, None, None, None
-    df_w = df.copy()
+    if df is None or df.empty: 
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     
+    df_w = df.copy()
     id_c, name_c = df_w.columns[0], df_w.columns[1]
     df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
     
@@ -178,28 +179,36 @@ else:
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
 
         if file:
-            df_raw = pd.read_excel(file)
-            m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
-            st.subheader(menu)
-            
-            if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
-            elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
-            elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
-            elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
-            elif menu == "❌ Miss Punch": st.dataframe(mi, use_container_width=True)
-            elif menu == "🛠️ Correction":
-                c1, c2 = st.columns(2)
-                with c1:
-                    with st.form("corr"):
-                        eid = st.text_input("Emp ID")
-                        dt = st.number_input("Date", 1, 31)
-                        cin = st.text_input("IN")
-                        cout = st.text_input("OUT")
-                        if st.form_submit_button("Update"):
-                            st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout})
-                            st.rerun()
-                with c2: 
-                    st.write("History:", st.session_state.corrs)
+            try:
+                df_raw = pd.read_excel(file)
+                m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
+                
+                st.subheader(menu)
+                if menu == "📊 Attendance Muster" and m is not None and not m.empty: 
+                    st.dataframe(m, use_container_width=True)
+                elif menu == "📈 Summary Report" and s is not None and not s.empty: 
+                    st.dataframe(s, use_container_width=True)
+                elif menu == "💰 OT Slab Report" and o is not None and not o.empty: 
+                    st.dataframe(o, use_container_width=True)
+                elif menu == "⚠️ Late/Early Log" and ex is not None and not ex.empty: 
+                    st.dataframe(ex, use_container_width=True)
+                elif menu == "❌ Miss Punch" and mi is not None and not mi.empty: 
+                    st.dataframe(mi, use_container_width=True)
+                elif menu == "🛠️ Correction":
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        with st.form("corr"):
+                            eid = st.text_input("Emp ID")
+                            dt = st.number_input("Date", 1, 31)
+                            cin = st.text_input("IN")
+                            cout = st.text_input("OUT")
+                            if st.form_submit_button("Update"):
+                                st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout})
+                                st.rerun()
+                    with c2: 
+                        st.write("History:", st.session_state.corrs)
+            except Exception as err_proc:
+                st.error(f"Error processing file: {str(err_proc)}")
         else:
             st.info("Sidebar se attendance Excel file upload karein.")
 
@@ -345,8 +354,4 @@ else:
                             doj_val = '' if pd.isna(row.get('Date of Joining')) else str(row.get('Date of Joining')).strip()
                             type_val = 'Full-Time' if pd.isna(row.get('Employment Type')) else str(row.get('Employment Type')).strip()
                             loc_val = '' if pd.isna(row.get('Work Location')) else str(row.get('Work Location')).strip()
-                            shift_val = '' if pd.isna(row.get('Shift Details')) else str(row.get('Shift Details')).strip()
-                            salary_val = '' if pd.isna(row.get('Salary Details')) else str(row.get('Salary Details')).strip()
-                            bank_val = '' if pd.isna(row.get('Bank Account Details')) else str(row.get('Bank Account Details')).strip().replace('\n', ' ')
-                            pf_val = '' if pd.isna(row.get('PF/ESI Information')) else str(row.get('PF/ESI Information')).strip().replace('\n', ' ')
-                            att_val = 'Linked' if pd.isna(row.get('Attendance Record')) else str(row.get('Attendan
+                            shift_val = '' if pd.isna(row.get('Shift Details')) else str(row.get('Shift Details'))
