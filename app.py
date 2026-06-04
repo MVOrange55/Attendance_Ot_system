@@ -129,7 +129,7 @@ def run_hr_engine(df, holidays, corrections):
     
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- CSV STRUCTURE HELPER FUNCTIONS ---
+# --- PROFILE EXPORT HELPERS ---
 def to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -173,23 +173,14 @@ if not st.session_state.auth:
         else: st.error("Wrong Password!")
 else:
     st.sidebar.title("🍊 Orange HR")
-    
-    # Do alag main sections: 1) Attendance Reports, 2) Employee Profile Directory
     app_mode = st.sidebar.radio("Navigation:", ["📊 Attendance Dashboard", "👤 Employee Profile Directory"])
     
-    # --- SECTION A: ATTENDANCE DASHBOARD ---
+    # --- SECTION A: ATTENDANCE DASHBOARD (UNCHANGED) ---
     if app_mode == "📊 Attendance Dashboard":
         st.title("🍊 Attendance Management Dashboard")
-        menu = st.sidebar.selectbox("Reports Menu:", [
-            "📊 Attendance Muster", 
-            "📈 Summary Report", 
-            "💰 OT Slab Report", 
-            "⚠️ Late/Early Log", 
-            "❌ Miss Punch", 
-            "🛠️ Correction"
-        ])
+        menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
         
-        file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
+        file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'], key="att_up")
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
 
         if file:
@@ -214,17 +205,17 @@ else:
         else:
             st.info("Sidebar se attendance Excel file upload karein.")
 
-    # --- SECTION B: EMPLOYEE PROFILE DIRECTORY (COMPLETELY ISOLATED) ---
+    # --- SECTION B: EMPLOYEE PROFILE DIRECTORY (UPDATED) ---
     else:
         st.title("👤 Advanced Employee Profile Directory")
         
-        tab1, tab2 = st.tabs(["➕ Add Detailed Profile", "📋 View & Manage Directory"])
+        # Teen tabs banaye hain: Manual entry, Bulk File upload, aur Directory management
+        tab1, tab2, tab3 = st.tabs(["➕ Add Profile (Manual)", "📤 Import / Upload CSV File", "📋 View & Manage Directory"])
         
+        # --- TAB 1: MANUAL ENTRY ---
         with tab1:
-            st.subheader("Enter Standard Employee Database Details")
+            st.subheader("Manual Employee Data Entry Form")
             with st.form("extended_profile_form", clear_on_submit=True):
-                
-                # IMPORTANT CSV COLUMN STRUCTURE FIELDS
                 st.markdown("### 📝 Personal Details")
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -236,7 +227,7 @@ else:
                     p_contact = st.text_input("Contact Number")
                     p_email = st.text_input("Email ID")
                 with col3:
-                    p_photo = st.file_uploader("Upload Photo", type=['jpg', 'jpeg', 'png'])
+                    p_photo = st.file_uploader("Upload Photo", type=['jpg', 'jpeg', 'png'], key="man_pic")
                     p_emergency = st.text_input("Emergency Contact")
                     p_address = st.text_area("Address", height=68)
 
@@ -275,7 +266,7 @@ else:
                     p_perf = st.text_area("Performance Details / Remarks")
                 with col10:
                     p_leave = st.text_input("Initial Leave Balance")
-                    p_docs = st.file_uploader("Upload Documents (Resume/Certificates)", type=['pdf', 'docx', 'zip'], accept_multiple_files=True)
+                    p_docs = st.file_uploader("Upload Documents", type=['pdf', 'docx', 'zip'], accept_multiple_files=True, key="man_doc")
 
                 submit_profile = st.form_submit_button("Save Complete Profile")
                 if submit_profile:
@@ -286,117 +277,87 @@ else:
                         if exists:
                             st.error(f"Employee ID {p_id} pehle se registered hai!")
                         else:
-                            # Strict CSV Structured Schema Alignment
                             st.session_state.profiles.append({
-                                'Employee ID': p_id.strip(),
-                                'Full Name': p_name.strip(),
-                                'Photo': p_photo.name if p_photo else 'No Photo Uploaded',
-                                'Gender': p_gender,
-                                'Date of Birth': p_dob.strftime('%Y-%m-%d'),
-                                'Contact Number': p_contact.strip(),
-                                'Email ID': p_email.strip(),
-                                'Address': p_address.strip().replace('\n', ' '),
-                                'Emergency Contact': p_emergency.strip(),
-                                'Department': p_dept.strip(),
-                                'Designation': p_desig.strip(),
-                                'Reporting Manager': p_manager.strip(),
-                                'Date of Joining': p_doj.strftime('%Y-%m-%d'),
-                                'Employment Type': p_type,
-                                'Work Location': p_location.strip(),
-                                'Shift Details': p_shift.strip(),
-                                'Salary Details': p_salary.strip(),
-                                'Bank Account Details': p_bank.strip().replace('\n', ' '),
-                                'PF/ESI Information': p_pf.strip().replace('\n', ' '),
-                                'Attendance Record': "Linked",
-                                'Leave Balance': p_leave.strip(),
-                                'Performance Details': p_perf.strip().replace('\n', ' '),
-                                'Skills & Qualifications': p_skills.strip().replace('\n', ' '),
-                                'Experience': p_exp.strip(),
-                                'Documents Upload': 'Uploaded' if p_docs else 'No Documents',
-                                'Status': p_status
+                                'Employee ID': p_id.strip(), 'Full Name': p_name.strip(), 'Photo': p_photo.name if p_photo else 'No Photo',
+                                'Gender': p_gender, 'Date of Birth': p_dob.strftime('%Y-%m-%d'), 'Contact Number': p_contact.strip(),
+                                'Email ID': p_email.strip(), 'Address': p_address.strip().replace('\n', ' '), 'Emergency Contact': p_emergency.strip(),
+                                'Department': p_dept.strip(), 'Designation': p_desig.strip(), 'Reporting Manager': p_manager.strip(),
+                                'Date of Joining': p_doj.strftime('%Y-%m-%d'), 'Employment Type': p_type, 'Work Location': p_location.strip(),
+                                'Shift Details': p_shift.strip(), 'Salary Details': p_salary.strip(), 'Bank Account Details': p_bank.strip().replace('\n', ' '),
+                                'PF/ESI Information': p_pf.strip().replace('\n', ' '), 'Attendance Record': "Linked", 'Leave Balance': p_leave.strip(),
+                                'Performance Details': p_perf.strip().replace('\n', ' '), 'Skills & Qualifications': p_skills.strip().replace('\n', ' '),
+                                'Experience': p_exp.strip(), 'Documents Upload': 'Uploaded' if p_docs else 'No Documents', 'Status': p_status
                             })
-                            st.success(f"{p_name} ka profile detailed database mein save ho gaya!")
+                            st.success(f"{p_name} ka profile save ho gaya!")
                             st.rerun()
 
+        # --- TAB 2: BULK CSV UPLOAD / IMPORT ---
         with tab2:
-            st.subheader("Registered Employee Directory")
-            if len(st.session_state.profiles) == 0:
-                st.info("Abhi koi profiles saved nahi hain.")
-            else:
-                # Direct conversion to clean structured DataFrame
-                display_df = pd.DataFrame(st.session_state.profiles)
-                
-                # --- FILTERS SYSTEM ---
-                st.markdown("#### 🔍 Filter Employees")
-                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-                
-                with f_col1:
-                    search_id = st.text_input("Filter by ID:")
-                with f_col2:
-                    search_name = st.text_input("Filter by Name:")
-                with f_col3:
-                    all_depts = ["All"] + list(display_df['Department'].unique())
-                    search_dept = st.selectbox("Filter by Department:", all_depts)
-                with f_col4:
-                    search_status = st.selectbox("Filter by Status:", ["All", "Active", "Inactive"])
-                
-                # Dynamic filtering
-                filtered_df = display_df.copy()
-                if search_id:
-                    filtered_df = filtered_df[filtered_df['Employee ID'].astype(str).str.contains(search_id, case=False)]
-                if search_name:
-                    filtered_df = filtered_df[filtered_df['Full Name'].str.contains(search_name, case=False)]
-                if search_dept != "All":
-                    filtered_df = filtered_df[filtered_df['Department'] == search_dept]
-                if search_status != "All":
-                    filtered_df = filtered_df[filtered_df['Status'] == search_status]
-                
-                # Show CSV Structure DataFrame
-                st.dataframe(filtered_df, use_container_width=True)
-                
-                # --- EXPORT DOWNLOAD SYSTEM ---
-                st.write("")
-                st.markdown("#### 📥 Export / Download Filtered Directory")
-                down_col1, down_col2, down_col3, _ = st.columns([1, 1, 1, 3])
-                
-                with down_col1:
-                    # Pure CSV Data Download
-                    csv_buffer = io.StringIO()
-                    filtered_df.to_csv(csv_buffer, index=False)
-                    st.download_button(
-                        label="Download CSV 📄",
-                        data=csv_buffer.getvalue(),
-                        file_name=f"Employee_Database_{datetime.today().strftime('%Y-%m-%d')}.csv",
-                        mime="text/csv"
-                    )
-                
-                with down_col2:
-                    excel_data = to_excel(filtered_df)
-                    st.download_button(
-                        label="Download Excel 📈",
-                        data=excel_data,
-                        file_name=f"Employee_Directory_{datetime.today().strftime('%Y-%m-%d')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                
-                with down_col3:
-                    html_data = to_html_for_pdf(filtered_df)
-                    st.download_button(
-                        label="Download PDF Print 📄",
-                        data=html_data,
-                        file_name=f"Employee_Directory_{datetime.today().strftime('%Y-%m-%d')}.html",
-                        mime="text/html"
-                    )
-                
-                # --- DELETE COMPONENT ---
-                st.write("---")
-                st.subheader("❌ Delete Employee Profile")
-                
-                delete_options = [f"{p['Employee ID']} - {p['Full Name']}" for p in st.session_state.profiles]
-                selected_to_delete = st.selectbox("Kisko directory se delete karna hai select karein:", delete_options)
-                
-                if st.button("Delete Selected Profile", type="primary"):
-                    target_id = selected_to_delete.split(" - ")[0]
-                    st.session_state.profiles = [p for p in st.session_state.profiles if p['Employee ID'] != target_id]
-                    st.success(f"Profile {selected_to_delete} deleted successfully!")
-                    st.rerun()
+            st.subheader("Bulk Import Employee Master File")
+            st.markdown("""
+            **⚠️ Rule:** Aapki CSV/Excel file mein exact wahi headers hone chahiye jo system match karega. 
+            Aap testing ke liye niche diye gaye button se **Sample Format Template** download kar sakte hain.
+            """)
+            
+            # Sample Template Builder for User
+            template_cols = ['Employee ID', 'Full Name', 'Photo', 'Gender', 'Date of Birth', 'Contact Number', 'Email ID', 'Address', 'Emergency Contact', 'Department', 'Designation', 'Reporting Manager', 'Date of Joining', 'Employment Type', 'Work Location', 'Shift Details', 'Salary Details', 'Bank Account Details', 'PF/ESI Information', 'Attendance Record', 'Leave Balance', 'Performance Details', 'Skills & Qualifications', 'Experience', 'Documents Upload', 'Status']
+            template_df = pd.DataFrame(columns=template_cols)
+            st.download_button(label="📥 Download Sample CSV Template", data=template_df.to_csv(index=False), file_name="Employee_Import_Template.csv", mime="text/csv")
+            
+            st.write("---")
+            uploaded_master = st.file_uploader("Apni HR CSV ya Excel File Select Karein:", type=['csv', 'xlsx'], key="bulk_profile_uploader")
+            
+            if uploaded_master:
+                try:
+                    if uploaded_master.name.endswith('.csv'):
+                        uploaded_df = pd.read_csv(uploaded_master)
+                    else:
+                        uploaded_df = pd.read_excel(uploaded_master)
+                    
+                    st.write("File Preview (Top 5 rows):", uploaded_df.head())
+                    
+                    if st.button("Confirm & Import All Data", type="primary"):
+                        success_count = 0
+                        duplicate_count = 0
+                        
+                        for _, row in uploaded_df.iterrows():
+                            emp_id = str(row.get('Employee ID', '')).strip().split('.')[0] # clean string id
+                            if emp_id == "" or pd.isna(row.get('Employee ID')):
+                                continue
+                            
+                            # Duplicate checker
+                            exists = any(str(p['Employee ID']) == emp_id for p in st.session_state.profiles)
+                            if exists:
+                                duplicate_count += 1
+                                continue
+                            
+                            # Map fields safely
+                            st.session_state.profiles.append({
+                                'Employee ID': emp_id,
+                                'Full Name': str(row.get('Full Name', 'Unnamed')).strip(),
+                                'Photo': str(row.get('Photo', 'No Photo')),
+                                'Gender': str(row.get('Gender', 'Male')),
+                                'Date of Birth': str(row.get('Date of Birth', '')),
+                                'Contact Number': str(row.get('Contact Number', '')),
+                                'Email ID': str(row.get('Email ID', '')),
+                                'Address': str(row.get('Address', '')).replace('\n', ' '),
+                                'Emergency Contact': str(row.get('Emergency Contact', '')),
+                                'Department': str(row.get('Department', 'General')).strip(),
+                                'Designation': str(row.get('Designation', 'Staff')).strip(),
+                                'Reporting Manager': str(row.get('Reporting Manager', '')),
+                                'Date of Joining': str(row.get('Date of Joining', '')),
+                                'Employment Type': str(row.get('Employment Type', 'Full-Time')),
+                                'Work Location': str(row.get('Work Location', '')),
+                                'Shift Details': str(row.get('Shift Details', '')),
+                                'Salary Details': str(row.get('Salary Details', '')),
+                                'Bank Account Details': str(row.get('Bank Account Details', '')),
+                                'PF/ESI Information': str(row.get('PF/ESI Information', '')),
+                                'Attendance Record': str(row.get('Attendance Record', 'Linked')),
+                                'Leave Balance': str(row.get('Leave Balance', '')),
+                                'Performance Details': str(row.get('Performance Details', '')),
+                                'Skills & Qualifications': str(row.get('Skills & Qualifications', '')),
+                                'Experience': str(row.get('Experience', '')),
+                                'Documents Upload': str(row.get('Documents Upload', 'No Documents'),),
+                                'Status': str(row.get('Status', 'Active'))
+                            })
+                            success_count += 1
