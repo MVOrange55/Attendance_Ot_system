@@ -28,8 +28,13 @@ def get_slab_ot(extra_hrs):
     return float(h + slab)
 
 def run_hr_engine(df, holidays, corrections):
+    # Default empty output to prevent crash
+    empty_out = {
+        "muster": pd.DataFrame(), "summary": pd.DataFrame(), 
+        "ot": pd.DataFrame(), "log": pd.DataFrame(), "missing": pd.DataFrame()
+    }
     if df is None or df.empty: 
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return empty_out
     
     df_w = df.copy()
     id_c, name_c = df_w.columns[0], df_w.columns[1]
@@ -88,7 +93,7 @@ def run_hr_engine(df, holidays, corrections):
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
                         if work_hrs < 4.0:
-                            early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
+                            early_log.append(str(t_out.strftime('%H:%M')) + " (Dt:" + str(d_i) + ")")
                     else:
                         t_start_calc = max(t_in, time(9, 30))
                         d_start_calc = datetime.combine(datetime.today(), t_start_calc)
@@ -102,10 +107,10 @@ def run_hr_engine(df, holidays, corrections):
                         else: status = "P"
 
                         if t_in > time(9, 35): 
-                            late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
+                            late_log.append(str(t_in.strftime('%H:%M')) + " (Dt:" + str(d_i) + ")")
                         
                         if work_hrs < 8.5:
-                            early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
+                            early_log.append(str(t_out.strftime('%H:%M')) + " (Dt:" + str(d_i) + ")")
 
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
@@ -128,7 +133,10 @@ def run_hr_engine(df, holidays, corrections):
             "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
         })
     
-    return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
+    return {
+        "muster": pd.DataFrame(res_m), "summary": pd.DataFrame(res_s), 
+        "ot": pd.DataFrame(res_o), "log": pd.DataFrame(res_ex), "missing": pd.DataFrame(res_mi)
+    }
 
 # --- PROFILE EXPORT HELPERS ---
 def to_excel(df):
@@ -140,13 +148,11 @@ def to_excel(df):
 def to_html_for_pdf(df):
     time_str = datetime.today().strftime('%Y-%m-%d %H:%M')
     html_table = df.to_html(index=False)
-    
     html_start = "<html><head><meta charset='utf-8'><style>"
     html_style = "table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px; } "
     html_thtd = "th, td { border: 1px solid #dddddd; text-align: left; padding: 6px; white-space: nowrap; } "
     html_color = "th { background-color: #f97316; color: white; font-weight: bold; } h2 { color: #f97316; font-family: Arial, sans-serif; }"
     html_body = "</style></head><body><h2>Orange House - Employee Profile Directory</h2>"
-    
     html_meta = "<p>Generated on: " + time_str + "</p><div style='overflow-x: auto;'>" + html_table + "</div></body></html>"
     return html_start + html_style + html_thtd + html_color + html_body + html_meta
 
@@ -181,19 +187,19 @@ else:
         if file:
             try:
                 df_raw = pd.read_excel(file)
-                m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
+                engine_output = run_hr_engine(df_raw, hols, st.session_state.corrs)
                 
                 st.subheader(menu)
-                if menu == "📊 Attendance Muster" and m is not None and not m.empty: 
-                    st.dataframe(m, use_container_width=True)
-                elif menu == "📈 Summary Report" and s is not None and not s.empty: 
-                    st.dataframe(s, use_container_width=True)
-                elif menu == "💰 OT Slab Report" and o is not None and not o.empty: 
-                    st.dataframe(o, use_container_width=True)
-                elif menu == "⚠️ Late/Early Log" and ex is not None and not ex.empty: 
-                    st.dataframe(ex, use_container_width=True)
-                elif menu == "❌ Miss Punch" and mi is not None and not mi.empty: 
-                    st.dataframe(mi, use_container_width=True)
+                if menu == "📊 Attendance Muster":
+                    st.dataframe(engine_output["muster"], use_container_width=True)
+                elif menu == "📈 Summary Report":
+                    st.dataframe(engine_output["summary"], use_container_width=True)
+                elif menu == "💰 OT Slab Report":
+                    st.dataframe(engine_output["ot"], use_container_width=True)
+                elif menu == "⚠️ Late/Early Log":
+                    st.dataframe(engine_output["log"], use_container_width=True)
+                elif menu == "❌ Miss Punch":
+                    st.dataframe(engine_output["missing"], use_container_width=True)
                 elif menu == "🛠️ Correction":
                     c1, c2 = st.columns(2)
                     with c1:
@@ -324,34 +330,29 @@ else:
                         
                         for _, row in uploaded_df.iterrows():
                             raw_id = row.get('Employee ID', '')
-                            if pd.isna(raw_id):
-                                continue
-                            if str(raw_id).strip() == "":
+                            if pd.isna(raw_id) or str(raw_id).strip() == "":
                                 continue
                             
                             emp_id = str(raw_id).strip().split('.')[0]
-                            exists = False
-                            for p in st.session_state.profiles:
-                                if str(p['Employee ID']) == emp_id:
-                                    exists = True
-                                    break
+                            exists = any(str(p['Employee ID']) == emp_id for p in st.session_state.profiles)
                             
                             if exists:
                                 duplicate_count += 1
                                 continue
                             
-                            f_name = 'Unnamed' if pd.isna(row.get('Full Name')) else str(row.get('Full Name')).strip()
-                            photo_val = 'No Photo' if pd.isna(row.get('Photo')) else str(row.get('Photo')).strip()
-                            gender_val = 'Male' if pd.isna(row.get('Gender')) else str(row.get('Gender')).strip()
-                            dob_val = '' if pd.isna(row.get('Date of Birth')) else str(row.get('Date of Birth')).strip()
-                            contact_val = '' if pd.isna(row.get('Contact Number')) else str(row.get('Contact Number')).strip()
-                            email_val = '' if pd.isna(row.get('Email ID')) else str(row.get('Email ID')).strip()
-                            address_val = '' if pd.isna(row.get('Address')) else str(row.get('Address')).strip().replace('\n', ' ')
-                            emergency_val = '' if pd.isna(row.get('Emergency Contact')) else str(row.get('Emergency Contact')).strip()
-                            dept_val = 'General' if pd.isna(row.get('Department')) else str(row.get('Department')).strip()
-                            desig_val = 'Staff' if pd.isna(row.get('Designation')) else str(row.get('Designation')).strip()
-                            manager_val = '' if pd.isna(row.get('Reporting Manager')) else str(row.get('Reporting Manager')).strip()
-                            doj_val = '' if pd.isna(row.get('Date of Joining')) else str(row.get('Date of Joining')).strip()
-                            type_val = 'Full-Time' if pd.isna(row.get('Employment Type')) else str(row.get('Employment Type')).strip()
-                            loc_val = '' if pd.isna(row.get('Work Location')) else str(row.get('Work Location')).strip()
-                            shift_val = '' if pd.isna(row.get('Shift Details')) else str(row.get('Shift Details'))
+                            bulk_item = {
+                                'Employee ID': emp_id,
+                                'Full Name': 'Unnamed' if pd.isna(row.get('Full Name')) else str(row.get('Full Name')).strip(),
+                                'Photo': 'No Photo' if pd.isna(row.get('Photo')) else str(row.get('Photo')).strip(),
+                                'Gender': 'Male' if pd.isna(row.get('Gender')) else str(row.get('Gender')).strip(),
+                                'Date of Birth': '' if pd.isna(row.get('Date of Birth')) else str(row.get('Date of Birth')).strip(),
+                                'Contact Number': '' if pd.isna(row.get('Contact Number')) else str(row.get('Contact Number')).strip(),
+                                'Email ID': '' if pd.isna(row.get('Email ID')) else str(row.get('Email ID')).strip(),
+                                'Address': '' if pd.isna(row.get('Address')) else str(row.get('Address')).strip().replace('\n', ' '),
+                                'Emergency Contact': '' if pd.isna(row.get('Emergency Contact')) else str(row.get('Emergency Contact')).strip(),
+                                'Department': 'General' if pd.isna(row.get('Department')) else str(row.get('Department')).strip(),
+                                'Designation': 'Staff' if pd.isna(row.get('Designation')) else str(row.get('Designation')).strip(),
+                                'Reporting Manager': '' if pd.isna(row.get('Reporting Manager')) else str(row.get('Reporting Manager')).strip(),
+                                'Date of Joining': '' if pd.isna(row.get('Date of Joining')) else str(row.get('Date of Joining')).strip(),
+                                'Employment Type': 'Full-Time' if pd.isna(row.get('Employment Type')) else str(row.get('Employment Type')).strip(),
+                                'Work Location': '' if pd.isna(row.get('Work Location')) e
