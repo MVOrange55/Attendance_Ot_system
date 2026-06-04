@@ -140,7 +140,6 @@ def to_html_for_pdf(df):
     time_str = datetime.today().strftime('%Y-%m-%d %H:%M')
     html_table = df.to_html(index=False)
     
-    # Completely safe non-f-string rendering block to avoid any brackets conflict
     html_start = "<html><head><meta charset='utf-8'><style>"
     html_style = "table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px; } "
     html_thtd = "th, td { border: 1px solid #dddddd; text-align: left; padding: 6px; white-space: nowrap; } "
@@ -350,4 +349,4 @@ else:
                             salary_val = '' if pd.isna(row.get('Salary Details')) else str(row.get('Salary Details')).strip()
                             bank_val = '' if pd.isna(row.get('Bank Account Details')) else str(row.get('Bank Account Details')).strip().replace('\n', ' ')
                             pf_val = '' if pd.isna(row.get('PF/ESI Information')) else str(row.get('PF/ESI Information')).strip().replace('\n', ' ')
-                            att_
+                            att_val = 'Linked' if pd.isna(row.get('Attendance Record')) else str(row.get('Attendan
