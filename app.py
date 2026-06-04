@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
 
-# --- 2. ENGINE FUNCTIONS (YOUR ORIGINAL) ---
+# --- 2. ENGINE FUNCTIONS (ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -59,8 +59,7 @@ def run_hr_engine(df, holidays, corrections):
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
-                m_type = "Out Missing" if t_in else "In Missing"
-                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "In": t_in.strftime('%H:%M') if t_in else "", "Out": t_out.strftime('%H:%M') if t_out else "", "Status": m_type})
+                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Missed Punch"})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
                 if d2 <= d1: d2 += timedelta(days=1)
@@ -72,34 +71,28 @@ def run_hr_engine(df, holidays, corrections):
                     else: h_c += 1
                 else:
                     if t_in >= time(13, 30):
-                        t_start = time(14, 0); d_start = datetime.combine(datetime.today(), t_start)
-                        work_hrs = (d2 - d_start).total_seconds() / 3600
+                        work_hrs = (d2 - datetime.combine(datetime.today(), time(14, 0))).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
-                        if work_hrs < 4.0: early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     else:
-                        t_start_calc = max(t_in, time(9, 30)); d_start_calc = datetime.combine(datetime.today(), t_start_calc)
-                        work_hrs = (d2 - d_start_calc).total_seconds() / 3600
+                        work_hrs = (d2 - datetime.combine(datetime.today(), max(t_in, time(9, 30)))).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
                         if actual_dur < 4.0: status = "AB/"
                         elif t_in > time(10, 16) or t_out < time(16, 0):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
-                        if t_in > time(9, 35): late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
-                        if work_hrs < 8.5: early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
         res_m.append(row_m)
-        res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot, "Payable": (p_c + ab_c + wo_c + h_c)})
-        row_o["Total OT"] = tot_ot
-        res_o.append(row_o)
-        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Late In": " | ".join(late_log), "Early Days": len(early_log), "Early Out": " | ".join(early_log)})
+        res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot})
+        res_o.append({**row_o, "Total OT": tot_ot})
+        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late/Early Info": "Logged"})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 3. SESSION STATES ---
+# --- 3. SESSION STATE ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
@@ -115,47 +108,42 @@ else:
     
     if nav == "📊 Attendance":
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
-        hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
-        menu = st.sidebar.selectbox("Reports Menu:", ["Muster", "Summary", "OT Slab", "Late/Early", "Miss Punch", "Correction"])
+        hols = st.sidebar.multiselect("Holidays:", range(1, 32))
+        menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "OT", "Miss Punch", "Correction"])
         if file:
             df_raw = pd.read_excel(file)
             m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
             if menu == "Muster": st.dataframe(m)
             elif menu == "Summary": st.dataframe(s)
-            elif menu == "OT Slab": st.dataframe(o)
-            elif menu == "Late/Early": st.dataframe(ex)
+            elif menu == "OT": st.dataframe(o)
             elif menu == "Miss Punch": st.dataframe(mi)
             elif menu == "Correction":
                 eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
                 if st.button("Update"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
     
     else: # --- DIRECTORY SECTION ---
-        t1, t2, t3 = st.tabs(["➕ Add/Edit", "📋 Import/Delete", "📊 Export"])
+        t1, t2, t3, t4 = st.tabs(["➕ Add/Edit", "📁 Import & Delete", "🔍 Filter & View", "📊 Export"])
         with t1:
             with st.form("emp_form", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                eid = c1.text_input("Employee ID *"); name = c1.text_input("Full Name *")
-                gen = c1.selectbox("Gender", ["Male", "Female"]); dob = c1.date_input("DOB")
-                doj = c2.date_input("DOJ"); dept = c2.text_input("Dept"); desig = c2.text_input("Desig")
-                mgr = c1.text_input("Manager"); fat = c1.text_input("Father"); cont = c2.text_input("Contact")
-                email = c2.text_input("Email"); addr = c1.text_area("Address"); emg = c2.text_input("Emergency")
-                esic = c1.text_input("ESIC"); pf = c2.text_input("PF"); qual = c1.text_input("Qualifications")
-                exp = c2.text_input("Experience"); aad = c1.text_input("Aadhaar"); pan = c2.text_input("PAN")
-                stat = c1.selectbox("Status", ["Active", "Inactive"]); mst = c2.selectbox("Marital Status", ["Single", "Married"])
-                nat = c1.text_input("Nationality"); bg = c2.text_input("Blood Group")
-                if st.form_submit_button("Save/Update Profile"):
+                eid = c1.text_input("ID *"); name = c1.text_input("Name *"); dept = c2.text_input("Dept")
+                stat = c2.selectbox("Status", ["Active", "Inactive"])
+                if st.form_submit_button("Save/Update"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(eid)]
-                    st.session_state.profiles.append({"ID": eid, "Name": name, "Dept": dept, "Status": stat, "Contact": cont, "ESIC": esic, "PAN": pan})
-                    st.success("Record Saved!"); st.rerun()
+                    st.session_state.profiles.append({"ID": eid, "Name": name, "Dept": dept, "Status": stat})
+                    st.success("Saved!"); st.rerun()
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
             if st.session_state.profiles:
-                df = pd.DataFrame(st.session_state.profiles)
-                st.dataframe(df)
-                del_id = st.selectbox("Delete ID:", df["ID"].unique())
-                if st.button("Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]; st.rerun()
+                del_id = st.selectbox("Select ID to Delete:", [p['ID'] for p in st.session_state.profiles])
+                if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if str(p['ID']) != str(del_id)]; st.rerun()
         with t3:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                st.download_button("📥 Export CSV", df.to_csv(index=False), "Directory.csv")
+                f_dept = st.multiselect("Filter Dept:", df["Dept"].unique())
+                st.dataframe(df[df["Dept"].isin(f_dept)] if f_dept else df)
+        with t4:
+            if st.session_state.profiles:
+                df = pd.DataFrame(st.session_state.profiles)
+                st.download_button("📥 Export Directory", df.to_csv(index=False), "Directory.csv")
