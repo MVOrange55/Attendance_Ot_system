@@ -52,7 +52,7 @@ def run_hr_engine(df, holidays, corrections):
         ename = str(block.iloc[0][name_c])
         
         row_m, row_o = {"ID": clean_id, "Name": ename}, {"ID": clean_id, "Name": ename}
-        sl_used, p_c, a_c, ab_c, wo_c, h_c, tot_ot = False, 0, 0, 0, 0, 0, 0.0
+        sl_used, p_c, a_c, ab_c, wo_c, h_c, tot_ot = False, 0, 0, 0, 0, 0.0
         late_log, early_log = [], []
 
         for d in dates:
@@ -368,4 +368,4 @@ else:
                                 'Leave Balance': clean_val(row.get('Leave Balance')),
                                 'Performance Details': clean_val(row.get('Performance Details')).replace('\n', ' '),
                                 'Skills & Qualifications': clean_val(row.get('Skills & Qualifications')).replace('\n', ' '),
-                                'Experience': clean
+                                'Experience': clean_va
