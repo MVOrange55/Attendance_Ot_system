@@ -136,8 +136,8 @@ else:
             with st.form("emp_form", clear_on_submit=True):
                 eid = st.text_input("Employee ID *")
                 name = st.text_input("Full Name *")
-                dob = st.date_input("Date of Birth *")
-               doj = st.date_input("Date of Joining *")
+                dob = st.date_input calander("Date of Birth *")
+               doj = st.date_input calander("Date of Joining *")
               gen = st.text_input("Gender *")
                 dept = st.text_input("Department")
                 desig = st.text_input("Designation")
