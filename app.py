@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
 
-# --- 2. ENGINE FUNCTIONS (ORIGINAL) ---
+# --- 2. ENGINE FUNCTIONS (YOUR ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -72,15 +72,13 @@ def run_hr_engine(df, holidays, corrections):
                     else: h_c += 1
                 else:
                     if t_in >= time(13, 30):
-                        t_start = time(14, 0)
-                        d_start = datetime.combine(datetime.today(), t_start)
+                        t_start = time(14, 0); d_start = datetime.combine(datetime.today(), t_start)
                         work_hrs = (d2 - d_start).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
                         if work_hrs < 4.0: early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     else:
-                        t_start_calc = max(t_in, time(9, 30))
-                        d_start_calc = datetime.combine(datetime.today(), t_start_calc)
+                        t_start_calc = max(t_in, time(9, 30)); d_start_calc = datetime.combine(datetime.today(), t_start_calc)
                         work_hrs = (d2 - d_start_calc).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
                         if actual_dur < 4.0: status = "AB/"
@@ -95,13 +93,13 @@ def run_hr_engine(df, holidays, corrections):
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
         res_m.append(row_m)
-        res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot, "Payable Days": (p_c + ab_c + wo_c + h_c)})
+        res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot, "Payable": (p_c + ab_c + wo_c + h_c)})
         row_o["Total OT"] = tot_ot
         res_o.append(row_o)
-        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Late In": " | ".join(late_log), "Early Out Days": len(early_log), "Early Out": " | ".join(early_log)})
+        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Late In": " | ".join(late_log), "Early Days": len(early_log), "Early Out": " | ".join(early_log)})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 3. SESSION STATE ---
+# --- 3. SESSION STATES ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
@@ -117,14 +115,14 @@ else:
     
     if nav == "📊 Attendance":
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
-        hols = st.sidebar.multiselect("Holidays:", range(1, 32))
-        menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "OT", "Late/Early", "Miss Punch", "Correction"])
+        hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
+        menu = st.sidebar.selectbox("Reports Menu:", ["Muster", "Summary", "OT Slab", "Late/Early", "Miss Punch", "Correction"])
         if file:
             df_raw = pd.read_excel(file)
             m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
             if menu == "Muster": st.dataframe(m)
             elif menu == "Summary": st.dataframe(s)
-            elif menu == "OT": st.dataframe(o)
+            elif menu == "OT Slab": st.dataframe(o)
             elif menu == "Late/Early": st.dataframe(ex)
             elif menu == "Miss Punch": st.dataframe(mi)
             elif menu == "Correction":
@@ -136,12 +134,19 @@ else:
         with t1:
             with st.form("emp_form", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                # (Sari fields wahi hain jo pehle thi)
                 eid = c1.text_input("Employee ID *"); name = c1.text_input("Full Name *")
-                if st.form_submit_button("Save/Update"):
+                gen = c1.selectbox("Gender", ["Male", "Female"]); dob = c1.date_input("DOB")
+                doj = c2.date_input("DOJ"); dept = c2.text_input("Dept"); desig = c2.text_input("Desig")
+                mgr = c1.text_input("Manager"); fat = c1.text_input("Father"); cont = c2.text_input("Contact")
+                email = c2.text_input("Email"); addr = c1.text_area("Address"); emg = c2.text_input("Emergency")
+                esic = c1.text_input("ESIC"); pf = c2.text_input("PF"); qual = c1.text_input("Qualifications")
+                exp = c2.text_input("Experience"); aad = c1.text_input("Aadhaar"); pan = c2.text_input("PAN")
+                stat = c1.selectbox("Status", ["Active", "Inactive"]); mst = c2.selectbox("Marital Status", ["Single", "Married"])
+                nat = c1.text_input("Nationality"); bg = c2.text_input("Blood Group")
+                if st.form_submit_button("Save/Update Profile"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(eid)]
-                    st.session_state.profiles.append({"ID": eid, "Name": name})
-                    st.success("Saved!"); st.rerun()
+                    st.session_state.profiles.append({"ID": eid, "Name": name, "Dept": dept, "Status": stat, "Contact": cont, "ESIC": esic, "PAN": pan})
+                    st.success("Record Saved!"); st.rerun()
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
