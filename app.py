@@ -167,10 +167,14 @@ if 'profiles' not in st.session_state: st.session_state.profiles = []
 # --- 4. UI ---
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
-    u = st.text_input("User ID"); p = st.text_input("Password", type="password")
+    u = st.text_input("User ID")
+    p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
-        else: st.error("Wrong Password!")
+        if u == "admin" and p == "orange_hr": 
+            st.session_state.auth = True
+            st.rerun()
+        else: 
+            st.error("Wrong Password!")
 else:
     st.sidebar.title("🍊 Orange HR")
     app_mode = st.sidebar.radio("Navigation:", ["📊 Attendance Dashboard", "👤 Employee Profile Directory"])
@@ -197,11 +201,15 @@ else:
                 c1, c2 = st.columns(2)
                 with c1:
                     with st.form("corr"):
-                        eid = st.text_input("Emp ID"); dt = st.number_input("Date", 1, 31)
-                        cin = st.text_input("IN"); cout = st.text_input("OUT")
+                        eid = st.text_input("Emp ID")
+                        dt = st.number_input("Date", 1, 31)
+                        cin = st.text_input("IN")
+                        cout = st.text_input("OUT")
                         if st.form_submit_button("Update"):
-                            st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
-                with c2: st.write("History:", st.session_state.corrs)
+                            st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout})
+                            st.rerun()
+                with c2: 
+                    st.write("History:", st.session_state.corrs)
         else:
             st.info("Sidebar se attendance Excel file upload karein.")
 
@@ -358,7 +366,4 @@ else:
                             })
                             success_count += 1
                         
-                        st.success(f"Import Finished! Successfully Added: {success_count} employees. Skipped duplicates: {duplicate_count}")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Error reading file: {e}"
+                        st.success(f"Import Finished! Successfully Added: {success_count} employees. Skipped duplicates: {duplicate_coun
