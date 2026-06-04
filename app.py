@@ -10,7 +10,7 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. ATTENDANCE ENGINE (ORIGINAL - UNTOUCHED) ---
+# --- 3. ATTENDANCE ENGINE (ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -113,27 +113,28 @@ else:
         menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "OT Slab", "Late/Early", "Miss Punch", "Correction"])
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
-            if menu == " 📊 Attendance Muster": st.dataframe(m)
-            elif menu == " 📈 Summary Report": st.dataframe(s)
-            elif menu == "💰OT Slab Report": st.dataframe(o)
-            elif menu == "⚠️ Late/Early Log": st.dataframe(ex)
-            elif menu == " ❌ Miss Punch": st.dataframe(mi)
-            elif menu == " 🛠️ Correction":
+            if menu == "Muster": st.dataframe(m)
+            elif menu == "Summary": st.dataframe(s)
+            elif menu == "OT Slab": st.dataframe(o)
+            elif menu == "Late/Early": st.dataframe(ex)
+            elif menu == "Miss Punch": st.dataframe(mi)
+            elif menu == "Correction":
                 eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
                 if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
-
-    else: # --- DIRECTORY SECTION ---
+    
+    else:
         st.subheader("Employee Profile Management")
-        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter Report", "📥 Download"])
+        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter/Edit", "📥 Download"])
         with t1:
-            with st.form("manual_emp"):
+            with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 fields = ["ID", "Name", "Gender", "DOB", "DOJ", "Dept", "Designation", "Manager", "FatherName", "Contact", "Email", "Address", "EmergencyName", "EmergencyContact", "ESIC", "PF", "Qualification", "Experience", "Aadhaar", "PAN", "Status", "MaritalStatus", "Nationality", "BloodGroup"]
                 data = {f: c1.text_input(f) if i%2==0 else c2.text_input(f) for i, f in enumerate(fields)}
                 photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
                 if st.form_submit_button("Save Record"):
                     if photo: data["Photo"] = photo.name
-                    st.session_state.profiles.append(data); st.success("Saved!"); st.rerun()
+                    st.session_state.profiles.append(data)
+                    st.success("Record Saved Successfully!")
         with t2:
             st.info("Bulk CSV Upload Headings: ID, Name, Gender, DOB, DOJ, Dept, Designation, Manager, FatherName, Contact, Email, Address, EmergencyName, EmergencyContact, ESIC, PF, Qualification, Experience, Aadhaar, PAN, Status, MaritalStatus, Nationality, BloodGroup")
             up = st.file_uploader("Upload CSV", type=['csv'])
@@ -145,7 +146,8 @@ else:
         with t4:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                f = st.multiselect("Filter by Dept:", df["Dept"].unique())
-                st.dataframe(df[df["Dept"].isin(f)] if f else df)
+                # Edit Feature
+                edited_df = st.data_editor(df, use_container_width=True)
+                if st.button("Save Changes"): st.session_state.profiles = edited_df.to_dict('records'); st.rerun()
         with t5:
             if st.session_state.profiles: st.download_button("📥 Download Report", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Full_Report.csv")
