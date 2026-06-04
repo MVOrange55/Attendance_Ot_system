@@ -110,6 +110,7 @@ else:
     nav = st.sidebar.radio("Navigation:", ["📊 Attendance Portal", "👤 Employee Directory"])
     
     if nav == "📊 Attendance Portal":
+        # ... [Attendance UI remains same] ...
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
         menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
@@ -129,6 +130,7 @@ else:
                         st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
 
     else: # --- EMPLOYEE DIRECTORY ---
+        st.subheader("👤 Employee Directory")
         t1, t2 = st.tabs(["➕ Add/Update Profile", "📋 Directory / Filter / Delete"])
         with t1:
             with st.form("emp_form", clear_on_submit=True):
@@ -139,20 +141,20 @@ else:
                 stat = st.selectbox("Status", ["Active", "Inactive"])
                 if st.form_submit_button("Save/Update Profile"):
                     if eid and name:
-                        # Purana record hatayein (update) aur naya add karein
+                        # Puraane record ko filter karke naya save karna = UPDATE
                         st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(eid)]
                         st.session_state.profiles.append({"ID": str(eid), "Name": name, "Dept": dept, "Contact": cont, "Status": stat})
-                        st.success("Profile saved successfully!"); st.rerun()
+                        st.success("Profile saved/updated successfully!"); st.rerun()
                     else: st.error("ID and Name are mandatory!")
         with t2:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                # Filter (safely)
-                f_dept = st.multiselect("Filter by Department:", df["Dept"].unique() if "Dept" in df.columns else [])
-                if f_dept: df = df[df["Dept"].isin(f_dept)]
+                # FILTERING
+                if "Dept" in df.columns:
+                    f_dept = st.multiselect("Filter by Department:", df["Dept"].unique())
+                    if f_dept: df = df[df["Dept"].isin(f_dept)]
                 st.dataframe(df, use_container_width=True)
-                
-                # Delete logic (safely)
+                # DELETION
                 del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
                 if st.button("Delete Selected Employee"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
