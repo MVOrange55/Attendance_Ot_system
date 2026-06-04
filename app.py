@@ -152,8 +152,10 @@ else:
                 f_dept = st.multiselect("Filter by Dept:", df["Dept"].unique() if "Dept" in df.columns else [])
                 if f_dept: df = df[df["Dept"].isin(f_dept)]
                 st.dataframe(df, use_container_width=True)
-                del_id = st.selectbox("Select ID to Delete:", df["ID"].unique())
-                if st.button("Delete Selected"):
+                
+                # DELETE LOGIC
+                del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
+                if st.button("Delete Selected Employee"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
                     st.rerun()
                 st.download_button("📥 Download CSV", df.to_csv(index=False), "Directory.csv")
