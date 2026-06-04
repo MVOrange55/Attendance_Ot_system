@@ -136,10 +136,13 @@ else:
             with st.form("emp_form", clear_on_submit=True):
                 eid = st.text_input("Employee ID *")
                 name = st.text_input("Full Name *")
-                gender = st.text_input("Gender *")
-                DOB = st.text_input("Date of Birth *")
-                DOJ = st.text_input("Date of Joining *")
+               gen = st.selectbox("Gender *" )
+               dob = st.date_input("Date of Birth *")
+               doj = st.date_input("Date of Joining *")
                 dept = st.text_input("Department")
+                desig = st.text_input("Designation")
+                  rep manager = st.text_input("Reporting Manager")
+                father name = st.text_input("Father's Name")
                 cont = st.text_input("Contact Number")
                 stat = st.selectbox("Status", ["Active", "Inactive"])
                 if st.form_submit_button("Save/Update Profile"):
