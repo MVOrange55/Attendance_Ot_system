@@ -146,8 +146,7 @@ def to_html_for_pdf(df):
     html_color = "th { background-color: #f97316; color: white; font-weight: bold; } h2 { color: #f97316; font-family: Arial, sans-serif; }"
     html_body = "</style></head><body><h2>Orange House - Employee Profile Directory</h2>"
     
-    html_meta = "<p>Generated on: " + time_str + "</p><div style='overflow-x: auto;'>" + html_table + "</div></body></html>"
-    
+    html_meta = f"<p>Generated on: {time_str}</p><div style='overflow-x: auto;'>{html_table}</div></body></html>"
     return html_start + html_style + html_thtd + html_color + html_body + html_meta
 
 # --- 3. SESSION STATES ---
@@ -325,7 +324,7 @@ else:
                                 duplicate_count += 1
                                 continue
                             
-                            # Independent data preparation lines to strictly avoid parsing syntax errors
+                            # Cleaned cell logic extracted entirely before dict initialization
                             f_name = str(row.get('Full Name', 'Unnamed')).strip() if not pd.isna(row.get('Full Name')) else 'Unnamed'
                             photo_val = str(row.get('Photo', 'No Photo')).strip() if not pd.isna(row.get('Photo')) else 'No Photo'
                             gender_val = str(row.get('Gender', 'Male')).strip() if not pd.isna(row.get('Gender')) else 'Male'
@@ -344,4 +343,4 @@ else:
                             salary_val = str(row.get('Salary Details', '')).strip() if not pd.isna(row.get('Salary Details')) else ''
                             bank_val = str(row.get('Bank Account Details', '')).strip().replace('\n', ' ') if not pd.isna(row.get('Bank Account Details')) else ''
                             pf_val = str(row.get('PF/ESI Information', '')).strip().replace('\n', ' ') if not pd.isna(row.get('PF/ESI Information')) else ''
-                            att_val = str(row.get('Attendance Record', 'Linked'
+                            att_val = str(row.get('Attendance Record', 'Linked')).strip() if not pd.isna(
