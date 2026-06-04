@@ -10,13 +10,7 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. HELPER FUNCTION ---
-def get_pdf_download_link(df):
-    # HTML table convert karke download button dete hain
-    html = df.to_html(index=False)
-    return html
-
-# --- 4. ENGINE FUNCTIONS (ORIGINAL) ---
+# --- 3. ATTENDANCE ENGINE (ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -105,7 +99,7 @@ def run_hr_engine(df, holidays, corrections):
         res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Early Days": len(early_log)})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 5. UI ---
+# --- 4. UI ---
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
     u = st.text_input("User ID"); p = st.text_input("Password", type="password")
@@ -138,23 +132,24 @@ else:
                     "ID": c1.text_input("ID"), "Name": c1.text_input("Name"), "Gender": c1.selectbox("Gender", ["Male", "Female"]),
                     "DOB": str(c1.date_input("DOB")), "DOJ": str(c1.date_input("DOJ")), "Dept": c2.text_input("Dept"),
                     "Contact": c1.text_input("Contact (Max 10)", max_chars=10), "PF": c2.text_input("PF (Max 12)", max_chars=12),
-                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), "Status": c2.selectbox("Status", ["Active", "Inactive"]),
+                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), "Status": c2.selectbox("Status", ["Active", "Inactive"], index=0),
                     "Designation": c2.text_input("Designation"), "Manager": c2.text_input("Manager"), "FatherName": c1.text_input("FatherName"), 
                     "Email": c2.text_input("Email"), "Address": c2.text_area("Address"), "EmergencyName": c1.text_input("EmergencyName"), 
                     "EmergencyContact": c1.text_input("EmergencyContact"), "ESIC": c2.text_input("ESIC"), "Qualification": c1.text_input("Qualification"), 
                     "Experience": c2.text_input("Experience"), "PAN": c2.text_input("PAN"), "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), 
                     "Nationality": c2.text_input("Nationality"), "BloodGroup": c1.text_input("BloodGroup")
                 }
-                photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
+                photo = st.file_uploader("Upload Photo", type=['jpg', 'png'])
                 if st.form_submit_button("Save Record"):
                     if photo: data["Photo"] = photo.name
                     st.session_state.profiles.append(data); st.success("Record Saved Successfully!")
         with t2:
+            st.info("Upload CSV with headers: ID, Name, Gender, DOB, DOJ, Dept, Designation, Manager, FatherName, Contact, Email, Address, EmergencyName, EmergencyContact, ESIC, PF, Qualification, Experience, Aadhaar, PAN, Status, MaritalStatus, Nationality, BloodGroup")
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
         with t3:
             if st.session_state.profiles:
-                del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
+                del_id = st.selectbox("Select ID to Delete:", [p.get('ID') for p in st.session_state.profiles])
                 if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
         with t4:
             if st.session_state.profiles:
@@ -164,6 +159,6 @@ else:
         with t5:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
-                # PDF ka link (Browser me open karke Print -> Save as PDF kar lo)
-                st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
+                st.download_button("📥 Download CSV", df.to_csv(index=False), "Employee_Report.csv")
+                html_data = df.to_html(index=False, border=1)
+                st.download_button("📥 Download as HTML (Print to PDF)", html_data, "Employee_Report.html", "text/html")
