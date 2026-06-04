@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
-from fpdf import FPDF
 
 # --- CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
@@ -11,7 +10,7 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- HR ENGINE FUNCTIONS ---
+# --- ENGINE FUNCTIONS ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -100,43 +99,40 @@ else:
     if nav == "📊 Attendance":
         st.subheader("📊 Attendance Portal")
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
-        hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
+        hols = st.sidebar.multiselect("Holidays (Dates):", range(1, 32))
         if file:
             df_raw = pd.read_excel(file)
             m, s, o, ex, mi = run_hr_engine(df_raw, hols, st.session_state.corrs)
             st.dataframe(m, use_container_width=True)
-    else:
+    
+    else: # --- DIRECTORY ---
         st.header("👤 Employee Directory")
-        t1, t2, t3 = st.tabs(["➕ Add / Edit Profile", "📋 Records & Import", "📊 Reports"])
+        t1, t2, t3 = st.tabs(["➕ Add/Edit", "📋 Import/Delete", "📊 Reports"])
         with t1:
             with st.form("emp_form", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 with c1:
                     eid = st.text_input("Employee ID *"); name = st.text_input("Full Name *")
-                    gen = st.selectbox("Gender *", ["Male", "Female", "Other"]); dob = st.date_input("Date of Birth *")
-                    doj = st.date_input("Date of Joining *"); dept = st.text_input("Department")
-                    desig = st.text_input("Designation"); mgr = st.text_input("Reporting Manager")
-                    fat = st.text_input("Father's Name"); cont = st.text_input("Contact Number *")
+                    gen = st.selectbox("Gender *", ["Male", "Female", "Other"]); dob = st.date_input("DOB *")
+                    doj = st.date_input("DOJ *"); dept = st.text_input("Department"); desig = st.text_input("Designation")
+                    mgr = st.text_input("Reporting Manager"); fat = st.text_input("Father's Name"); cont = st.text_input("Contact *")
                 with c2:
-                    email = st.text_input("Email ID"); addr = st.text_area("Address")
-                    emg = st.text_input("Emergency Name"); esic = st.text_input("ESIC"); pf = st.text_input("PF")
-                    qual = st.text_input("Qualifications"); exp = st.text_input("Experience")
-                    aad = st.text_input("Aadhaar"); pan = st.text_input("PAN")
-                    stat = st.selectbox("Status", ["Active", "Inactive"]); mst = st.selectbox("Marital Status", ["Single", "Married"])
+                    email = st.text_input("Email ID"); addr = st.text_area("Address"); emg = st.text_input("Emergency Person")
+                    emg_no = st.text_input("Emergency Contact"); esic = st.text_input("ESIC"); pf = st.text_input("PF")
+                    qual = st.text_input("Qualifications"); exp = st.text_input("Experience"); aad = st.text_input("Aadhaar")
+                    pan = st.text_input("PAN"); stat = st.selectbox("Status", ["Active", "Inactive"]); mst = st.selectbox("Marital", ["Single", "Married"])
                     nat = st.text_input("Nationality"); bg = st.text_input("Blood Group")
                 if st.form_submit_button("Save/Update Profile"):
                     st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(eid)]
-                    st.session_state.profiles.append({"ID": eid, "Name": name, "Dept": dept, "Manager": mgr, "DOJ": str(doj), "Contact": cont, "ESIC": esic, "PAN": pan, "Status": stat})
+                    st.session_state.profiles.append({"ID": eid, "Name": name, "Dept": dept, "Manager": mgr, "DOJ": str(doj), "Contact": cont, "ESIC": esic, "PAN": pan, "Status": stat, "Blood Group": bg})
                     st.success("Record Saved!"); st.rerun()
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                f_dept = st.multiselect("Filter Dept:", df["Dept"].unique())
-                if f_dept: df = df[df["Dept"].isin(f_dept)]
                 st.dataframe(df, use_container_width=True)
-                del_id = st.selectbox("Select ID to Delete:", df["ID"].unique())
+                del_id = st.selectbox("Delete ID:", df["ID"].unique())
                 if st.button("Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]; st.rerun()
         with t3:
             if st.session_state.profiles:
