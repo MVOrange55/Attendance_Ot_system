@@ -113,12 +113,12 @@ else:
         menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "OT Slab", "Late/Early", "Miss Punch", "Correction"])
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
-            if menu == "Muster": st.dataframe(m)
-            elif menu == "Summary": st.dataframe(s)
-            elif menu == "OT Slab": st.dataframe(o)
-            elif menu == "Late/Early": st.dataframe(ex)
-            elif menu == "Miss Punch": st.dataframe(mi)
-            elif menu == "Correction":
+            if menu == " 📊 Attendance Muster": st.dataframe(m)
+            elif menu == " 📈 Summary Report": st.dataframe(s)
+            elif menu == "💰OT Slab Report": st.dataframe(o)
+            elif menu == "⚠️ Late/Early Log": st.dataframe(ex)
+            elif menu == " ❌ Miss Punch": st.dataframe(mi)
+            elif menu == " 🛠️ Correction":
                 eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
                 if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
 
