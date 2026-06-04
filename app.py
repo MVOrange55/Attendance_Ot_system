@@ -127,7 +127,7 @@ def run_hr_engine(df, holidays, corrections):
             "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
         })
     
-    return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
+    return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(ex), pd.DataFrame(mi)
 
 # --- PROFILE EXPORT HELPERS ---
 def to_excel(df):
@@ -315,32 +315,39 @@ else:
                         
                         for _, row in uploaded_df.iterrows():
                             raw_id = row.get('Employee ID', '')
-                            if pd.isna(raw_id) or str(raw_id).strip() == "":
+                            if pd.isna(raw_id):
+                                continue
+                            if str(raw_id).strip() == "":
                                 continue
                             
                             emp_id = str(raw_id).strip().split('.')[0]
-                            exists = any(str(p['Employee ID']) == emp_id for p in st.session_state.profiles)
+                            exists = False
+                            for p in st.session_state.profiles:
+                                if str(p['Employee ID']) == emp_id:
+                                    exists = True
+                                    break
+                            
                             if exists:
                                 duplicate_count += 1
                                 continue
                             
-                            # Cleaned cell logic extracted entirely before dict initialization
-                            f_name = str(row.get('Full Name', 'Unnamed')).strip() if not pd.isna(row.get('Full Name')) else 'Unnamed'
-                            photo_val = str(row.get('Photo', 'No Photo')).strip() if not pd.isna(row.get('Photo')) else 'No Photo'
-                            gender_val = str(row.get('Gender', 'Male')).strip() if not pd.isna(row.get('Gender')) else 'Male'
-                            dob_val = str(row.get('Date of Birth', '')).strip() if not pd.isna(row.get('Date of Birth')) else ''
-                            contact_val = str(row.get('Contact Number', '')).strip() if not pd.isna(row.get('Contact Number')) else ''
-                            email_val = str(row.get('Email ID', '')).strip() if not pd.isna(row.get('Email ID')) else ''
-                            address_val = str(row.get('Address', '')).strip().replace('\n', ' ') if not pd.isna(row.get('Address')) else ''
-                            emergency_val = str(row.get('Emergency Contact', '')).strip() if not pd.isna(row.get('Emergency Contact')) else ''
-                            dept_val = str(row.get('Department', 'General')).strip() if not pd.isna(row.get('Department')) else 'General'
-                            desig_val = str(row.get('Designation', 'Staff')).strip() if not pd.isna(row.get('Designation')) else 'Staff'
-                            manager_val = str(row.get('Reporting Manager', '')).strip() if not pd.isna(row.get('Reporting Manager')) else ''
-                            doj_val = str(row.get('Date of Joining', '')).strip() if not pd.isna(row.get('Date of Joining')) else ''
-                            type_val = str(row.get('Employment Type', 'Full-Time')).strip() if not pd.isna(row.get('Employment Type')) else 'Full-Time'
-                            loc_val = str(row.get('Work Location', '')).strip() if not pd.isna(row.get('Work Location')) else ''
-                            shift_val = str(row.get('Shift Details', '')).strip() if not pd.isna(row.get('Shift Details')) else ''
-                            salary_val = str(row.get('Salary Details', '')).strip() if not pd.isna(row.get('Salary Details')) else ''
-                            bank_val = str(row.get('Bank Account Details', '')).strip().replace('\n', ' ') if not pd.isna(row.get('Bank Account Details')) else ''
-                            pf_val = str(row.get('PF/ESI Information', '')).strip().replace('\n', ' ') if not pd.isna(row.get('PF/ESI Information')) else ''
-                            att_val = str(row.get('Attendance Record', 'Linked')).strip() if not pd.isna(
+                            # Standardized parsing steps to completely avoid script syntax failures
+                            f_name = 'Unnamed' if pd.isna(row.get('Full Name')) else str(row.get('Full Name')).strip()
+                            photo_val = 'No Photo' if pd.isna(row.get('Photo')) else str(row.get('Photo')).strip()
+                            gender_val = 'Male' if pd.isna(row.get('Gender')) else str(row.get('Gender')).strip()
+                            dob_val = '' if pd.isna(row.get('Date of Birth')) else str(row.get('Date of Birth')).strip()
+                            contact_val = '' if pd.isna(row.get('Contact Number')) else str(row.get('Contact Number')).strip()
+                            email_val = '' if pd.isna(row.get('Email ID')) else str(row.get('Email ID')).strip()
+                            address_val = '' if pd.isna(row.get('Address')) else str(row.get('Address')).strip().replace('\n', ' ')
+                            emergency_val = '' if pd.isna(row.get('Emergency Contact')) else str(row.get('Emergency Contact')).strip()
+                            dept_val = 'General' if pd.isna(row.get('Department')) else str(row.get('Department')).strip()
+                            desig_val = 'Staff' if pd.isna(row.get('Designation')) else str(row.get('Designation')).strip()
+                            manager_val = '' if pd.isna(row.get('Reporting Manager')) else str(row.get('Reporting Manager')).strip()
+                            doj_val = '' if pd.isna(row.get('Date of Joining')) else str(row.get('Date of Joining')).strip()
+                            type_val = 'Full-Time' if pd.isna(row.get('Employment Type')) else str(row.get('Employment Type')).strip()
+                            loc_val = '' if pd.isna(row.get('Work Location')) else str(row.get('Work Location')).strip()
+                            shift_val = '' if pd.isna(row.get('Shift Details')) else str(row.get('Shift Details')).strip()
+                            salary_val = '' if pd.isna(row.get('Salary Details')) else str(row.get('Salary Details')).strip()
+                            bank_val = '' if pd.isna(row.get('Bank Account Details')) else str(row.get('Bank Account Details')).strip().replace('\n', ' ')
+                            pf_val = '' if pd.isna(row.get('PF/ESI Information')) else str(row.get('PF/ESI Information')).strip().replace('\n', ' ')
+                            att_val
