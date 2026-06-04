@@ -2,15 +2,14 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
 
-# --- 1. PAGE CONFIG ---
+# --- 1. PAGE CONFIG & SESSION ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
 
-# --- 2. SESSION STATES ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. ENGINE FUNCTIONS (ORIGINAL) ---
+# --- 2. ENGINE FUNCTIONS (ORIGINAL) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -101,13 +100,12 @@ def run_hr_engine(df, holidays, corrections):
         res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Early Out Days": len(early_log)})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 4. UI ---
+# --- 3. UI ---
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
     u = st.text_input("User ID"); p = st.text_input("Password", type="password")
     if st.button("Login"):
         if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
-        else: st.error("Wrong Password!")
 else:
     nav = st.sidebar.radio("Navigation:", ["📊 Attendance Portal", "👤 Employee Directory"])
     
@@ -131,33 +129,33 @@ else:
                         st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
 
     else: # --- EMPLOYEE DIRECTORY ---
-        st.subheader("👤 Employee Directory")
         t1, t2 = st.tabs(["➕ Add/Update Profile", "📋 Directory / Filter / Delete"])
         with t1:
             with st.form("emp_form", clear_on_submit=True):
-                c1, c2 = st.columns(2)
-                with c1:
-                    eid = st.text_input("Employee ID *"); name = st.text_input("Full Name *")
-                    dept = st.text_input("Department"); cont = st.text_input("Contact")
-                with c2:
-                    stat = st.selectbox("Status", ["Active", "Inactive"])
+                eid = st.text_input("Employee ID *")
+                name = st.text_input("Full Name *")
+                dept = st.text_input("Department")
+                cont = st.text_input("Contact Number")
+                stat = st.selectbox("Status", ["Active", "Inactive"])
                 if st.form_submit_button("Save/Update Profile"):
                     if eid and name:
-                        new_prof = {"ID": str(eid), "Name": name, "Dept": dept, "Contact": cont, "Status": stat}
+                        # Purana record hatayein (update) aur naya add karein
                         st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(eid)]
-                        st.session_state.profiles.append(new_prof)
-                        st.success("Saved!"); st.rerun()
+                        st.session_state.profiles.append({"ID": str(eid), "Name": name, "Dept": dept, "Contact": cont, "Status": stat})
+                        st.success("Profile saved successfully!"); st.rerun()
+                    else: st.error("ID and Name are mandatory!")
         with t2:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                # Safely handle filtering and deletion
-                if "Dept" in df.columns:
-                    f_dept = st.multiselect("Filter by Dept:", df["Dept"].unique())
-                    if f_dept: df = df[df["Dept"].isin(f_dept)]
+                # Filter (safely)
+                f_dept = st.multiselect("Filter by Department:", df["Dept"].unique() if "Dept" in df.columns else [])
+                if f_dept: df = df[df["Dept"].isin(f_dept)]
                 st.dataframe(df, use_container_width=True)
-                if "ID" in df.columns:
-                    del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
-                    if st.button("Delete Selected"):
-                        st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
-                        st.rerun()
-                st.download_button("📥 Download CSV", df.to_csv(index=False), "Directory.csv")
+                
+                # Delete logic (safely)
+                del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
+                if st.button("Delete Selected Employee"):
+                    st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
+                    st.rerun()
+                st.download_button("📥 Export CSV", df.to_csv(index=False), "Directory.csv")
+            else: st.info("No records found.")
