@@ -175,7 +175,7 @@ else:
     st.sidebar.title("🍊 Orange HR")
     app_mode = st.sidebar.radio("Navigation:", ["📊 Attendance Dashboard", "👤 Employee Profile Directory"])
     
-    # --- SECTION A: ATTENDANCE DASHBOARD (UNCHANGED) ---
+    # --- SECTION A: ATTENDANCE DASHBOARD ---
     if app_mode == "📊 Attendance Dashboard":
         st.title("🍊 Attendance Management Dashboard")
         menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
@@ -205,11 +205,10 @@ else:
         else:
             st.info("Sidebar se attendance Excel file upload karein.")
 
-    # --- SECTION B: EMPLOYEE PROFILE DIRECTORY (UPDATED) ---
+    # --- SECTION B: EMPLOYEE PROFILE DIRECTORY ---
     else:
         st.title("👤 Advanced Employee Profile Directory")
         
-        # Teen tabs banaye hain: Manual entry, Bulk File upload, aur Directory management
         tab1, tab2, tab3 = st.tabs(["➕ Add Profile (Manual)", "📤 Import / Upload CSV File", "📋 View & Manage Directory"])
         
         # --- TAB 1: MANUAL ENTRY ---
@@ -299,7 +298,6 @@ else:
             Aap testing ke liye niche diye gaye button se **Sample Format Template** download kar sakte hain.
             """)
             
-            # Sample Template Builder for User
             template_cols = ['Employee ID', 'Full Name', 'Photo', 'Gender', 'Date of Birth', 'Contact Number', 'Email ID', 'Address', 'Emergency Contact', 'Department', 'Designation', 'Reporting Manager', 'Date of Joining', 'Employment Type', 'Work Location', 'Shift Details', 'Salary Details', 'Bank Account Details', 'PF/ESI Information', 'Attendance Record', 'Leave Balance', 'Performance Details', 'Skills & Qualifications', 'Experience', 'Documents Upload', 'Status']
             template_df = pd.DataFrame(columns=template_cols)
             st.download_button(label="📥 Download Sample CSV Template", data=template_df.to_csv(index=False), file_name="Employee_Import_Template.csv", mime="text/csv")
@@ -321,17 +319,15 @@ else:
                         duplicate_count = 0
                         
                         for _, row in uploaded_df.iterrows():
-                            emp_id = str(row.get('Employee ID', '')).strip().split('.')[0] # clean string id
+                            emp_id = str(row.get('Employee ID', '')).strip().split('.')[0]
                             if emp_id == "" or pd.isna(row.get('Employee ID')):
                                 continue
                             
-                            # Duplicate checker
                             exists = any(str(p['Employee ID']) == emp_id for p in st.session_state.profiles)
                             if exists:
                                 duplicate_count += 1
                                 continue
                             
-                            # Map fields safely
                             st.session_state.profiles.append({
                                 'Employee ID': emp_id,
                                 'Full Name': str(row.get('Full Name', 'Unnamed')).strip(),
@@ -357,7 +353,12 @@ else:
                                 'Performance Details': str(row.get('Performance Details', '')),
                                 'Skills & Qualifications': str(row.get('Skills & Qualifications', '')),
                                 'Experience': str(row.get('Experience', '')),
-                                'Documents Upload': str(row.get('Documents Upload', 'No Documents'),),
+                                'Documents Upload': str(row.get('Documents Upload', 'No Documents')),
                                 'Status': str(row.get('Status', 'Active'))
                             })
                             success_count += 1
+                        
+                        st.success(f"Import Finished! Successfully Added: {success_count} employees. Skipped duplicates: {duplicate_count}")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error reading file: {e}"
