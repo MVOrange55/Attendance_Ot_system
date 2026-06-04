@@ -42,7 +42,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+2, str(c['date'])] = c['out']
 
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [3, 10, 17, 24 ] 
+    sundays = [3, 10, 17, 24] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
 
     for eid in df_w[id_c].unique():
@@ -327,36 +327,23 @@ else:
                                 duplicate_count += 1
                                 continue
                             
-                            def clean_val(val, default=""):
-                                if pd.isna(val): return default
-                                return str(val).strip()
-
-                            bulk_item = {
-                                'Employee ID': emp_id,
-                                'Full Name': clean_val(row.get('Full Name'), 'Unnamed'),
-                                'Photo': clean_val(row.get('Photo'), 'No Photo'),
-                                'Gender': clean_val(row.get('Gender'), 'Male'),
-                                'Date of Birth': clean_val(row.get('Date of Birth')),
-                                'Contact Number': clean_val(row.get('Contact Number')),
-                                'Email ID': clean_val(row.get('Email ID')),
-                                'Address': clean_val(row.get('Address')).replace('\n', ' '),
-                                'Emergency Contact': clean_val(row.get('Emergency Contact')),
-                                'Department': clean_val(row.get('Department'), 'General'),
-                                'Designation': clean_val(row.get('Designation'), 'Staff'),
-                                'Reporting Manager': clean_val(row.get('Reporting Manager')),
-                                'Date of Joining': clean_val(row.get('Date of Joining')),
-                                'Employment Type': clean_val(row.get('Employment Type'), 'Full-Time'),
-                                'Work Location': clean_val(row.get('Work Location')),
-                                'Shift Details': clean_val(row.get('Shift Details')),
-                                'Salary Details': clean_val(row.get('Salary Details')),
-                                'Bank Account Details': clean_val(row.get('Bank Account Details')).replace('\n', ' '),
-                                'PF/ESI Information': clean_val(row.get('PF/ESI Information')).replace('\n', ' '),
-                                'Attendance Record': clean_val(row.get('Attendance Record'), 'Linked'),
-                                'Leave Balance': clean_val(row.get('Leave Balance')),
-                                'Performance Details': clean_val(row.get('Performance Details')).replace('\n', ' '),
-                                'Skills & Qualifications': clean_val(row.get('Skills & Qualifications')).replace('\n', ' '),
-                                'Experience': clean_val(row.get('Experience')),
-                                'Documents Upload': clean_val(row.get('Documents Upload'), 'No Documents'),
-                                'Status': clean_val(row.get('Status'), 'Active')
-                            }
-                            st.session_state.profiles.append(bulk_item
+                            # Clean cell logic values separately to prevent structure breakdowns
+                            f_name = str(row.get('Full Name', 'Unnamed')).strip() if not pd.isna(row.get('Full Name')) else 'Unnamed'
+                            photo_val = str(row.get('Photo', 'No Photo')).strip() if not pd.isna(row.get('Photo')) else 'No Photo'
+                            gender_val = str(row.get('Gender', 'Male')).strip() if not pd.isna(row.get('Gender')) else 'Male'
+                            dob_val = str(row.get('Date of Birth', '')).strip() if not pd.isna(row.get('Date of Birth')) else ''
+                            contact_val = str(row.get('Contact Number', '')).strip() if not pd.isna(row.get('Contact Number')) else ''
+                            email_val = str(row.get('Email ID', '')).strip() if not pd.isna(row.get('Email ID')) else ''
+                            address_val = str(row.get('Address', '')).strip().replace('\n', ' ') if not pd.isna(row.get('Address')) else ''
+                            emergency_val = str(row.get('Emergency Contact', '')).strip() if not pd.isna(row.get('Emergency Contact')) else ''
+                            dept_val = str(row.get('Department', 'General')).strip() if not pd.isna(row.get('Department')) else 'General'
+                            desig_val = str(row.get('Designation', 'Staff')).strip() if not pd.isna(row.get('Designation')) else 'Staff'
+                            manager_val = str(row.get('Reporting Manager', '')).strip() if not pd.isna(row.get('Reporting Manager')) else ''
+                            doj_val = str(row.get('Date of Joining', '')).strip() if not pd.isna(row.get('Date of Joining')) else ''
+                            type_val = str(row.get('Employment Type', 'Full-Time')).strip() if not pd.isna(row.get('Employment Type')) else 'Full-Time'
+                            loc_val = str(row.get('Work Location', '')).strip() if not pd.isna(row.get('Work Location')) else ''
+                            shift_val = str(row.get('Shift Details', '')).strip() if not pd.isna(row.get('Shift Details')) else ''
+                            salary_val = str(row.get('Salary Details', '')).strip() if not pd.isna(row.get('Salary Details')) else ''
+                            bank_val = str(row.get('Bank Account Details', '')).strip().replace('\n', ' ') if not pd.isna(row.get('Bank Account Details')) else ''
+                            pf_val = str(row.get('PF/ESI Information', '')).strip().replace('\n', ' ') if not pd.isna(row.get('PF/ESI Information')) else ''
+                            att_val = str(row.get('Attendance Record', 'Linked')).strip() if not pd.isna(row.get('Attendance Record')) else 'Linked'
