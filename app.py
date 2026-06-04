@@ -124,21 +124,23 @@ else:
 
     else: # --- DIRECTORY SECTION ---
         st.subheader("Employee Profile Management")
-        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Manual", "📁 Bulk Import", "🗑️ Delete", "🔍 Filter", "📥 Download"])
+        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter Report", "📥 Download"])
         with t1:
             with st.form("manual_emp"):
                 c1, c2 = st.columns(2)
-                # All 24 fields
                 fields = ["ID", "Name", "Gender", "DOB", "DOJ", "Dept", "Designation", "Manager", "FatherName", "Contact", "Email", "Address", "EmergencyName", "EmergencyContact", "ESIC", "PF", "Qualification", "Experience", "Aadhaar", "PAN", "Status", "MaritalStatus", "Nationality", "BloodGroup"]
                 data = {f: c1.text_input(f) if i%2==0 else c2.text_input(f) for i, f in enumerate(fields)}
-                if st.form_submit_button("Save"): st.session_state.profiles.append(data); st.success("Saved!"); st.rerun()
+                photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
+                if st.form_submit_button("Save Record"):
+                    if photo: data["Photo"] = photo.name
+                    st.session_state.profiles.append(data); st.success("Saved!"); st.rerun()
         with t2:
-            st.info("CSV Headings: ID, Name, Gender, DOB, DOJ, Dept, Designation, Manager, FatherName, Contact, Email, Address, EmergencyName, EmergencyContact, ESIC, PF, Qualification, Experience, Aadhaar, PAN, Status, MaritalStatus, Nationality, BloodGroup")
+            st.info("Bulk CSV Upload Headings: ID, Name, Gender, DOB, DOJ, Dept, Designation, Manager, FatherName, Contact, Email, Address, EmergencyName, EmergencyContact, ESIC, PF, Qualification, Experience, Aadhaar, PAN, Status, MaritalStatus, Nationality, BloodGroup")
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
         with t3:
             if st.session_state.profiles:
-                del_id = st.selectbox("Select ID to Delete:", [p.get('ID') for p in st.session_state.profiles])
+                del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
                 if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
         with t4:
             if st.session_state.profiles:
@@ -146,4 +148,4 @@ else:
                 f = st.multiselect("Filter by Dept:", df["Dept"].unique())
                 st.dataframe(df[df["Dept"].isin(f)] if f else df)
         with t5:
-            if st.session_state.profiles: st.download_button("📥 Download All", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Full_Directory.csv")
+            if st.session_state.profiles: st.download_button("📥 Download Report", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Full_Report.csv")
