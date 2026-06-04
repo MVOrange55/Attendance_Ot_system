@@ -136,10 +136,9 @@ else:
             with st.form("emp_form", clear_on_submit=True):
                 eid = st.text_input("Employee ID *")
                 name = st.text_input("Full Name *")
-               # Gender default 'Male' (index 0)
-                    gen = st.text_input("Gender *", ["Male", "Female", "Other"], index=0)
-               dob = st.date_input("Date of Birth *")
+                dob = st.date_input("Date of Birth *")
                doj = st.date_input("Date of Joining *")
+              gen = st.text_input("Gender *")
                 dept = st.text_input("Department")
                 desig = st.text_input("Designation")
                   rep manager = st.text_input("Reporting Manager")
