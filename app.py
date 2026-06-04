@@ -28,7 +28,6 @@ def get_slab_ot(extra_hrs):
     return float(h + slab)
 
 def run_hr_engine(df, holidays, corrections):
-    # Default empty output to prevent crash
     empty_out = {
         "muster": pd.DataFrame(), "summary": pd.DataFrame(), 
         "ot": pd.DataFrame(), "log": pd.DataFrame(), "missing": pd.DataFrame()
@@ -355,4 +354,4 @@ else:
                                 'Reporting Manager': '' if pd.isna(row.get('Reporting Manager')) else str(row.get('Reporting Manager')).strip(),
                                 'Date of Joining': '' if pd.isna(row.get('Date of Joining')) else str(row.get('Date of Joining')).strip(),
                                 'Employment Type': 'Full-Time' if pd.isna(row.get('Employment Type')) else str(row.get('Employment Type')).strip(),
-                                'Work Location': '' if pd.isna(row.get('Work Location')) e
+                                'Work Location': '' if pd.isna(row.get('Work Location')) else str(row.get('Work Location')).strip(),
