@@ -5,7 +5,12 @@ from datetime import datetime, time, timedelta
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Orange House HR Portal", layout="wide", page_icon="🍊")
 
-# --- 2. ENGINE FUNCTIONS ---
+# --- 2. SESSION STATES ---
+if 'auth' not in st.session_state: st.session_state.auth = False
+if 'corrs' not in st.session_state: st.session_state.corrs = []
+if 'profiles' not in st.session_state: st.session_state.profiles = []
+
+# --- 3. ENGINE FUNCTIONS (Attendance) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -38,7 +43,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+1, str(c['date'])] = c['in']
             df_w.at[idx+2, str(c['date'])] = c['out']
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [3, 10, 17, 24]
+    sundays = [3, 10, 17, 24] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
     for eid in df_w[id_c].unique():
         if pd.isna(eid): continue
@@ -59,7 +64,8 @@ def run_hr_engine(df, holidays, corrections):
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
-                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Missing Punch"})
+                m_type = "Out Missing" if t_in else "In Missing"
+                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": m_type})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
                 if d2 <= d1: d2 += timedelta(days=1)
@@ -67,7 +73,7 @@ def run_hr_engine(df, holidays, corrections):
                 if is_off_day:
                     status = "WO" if d_i in sundays else "H"
                     day_ot = get_slab_ot(actual_dur)
-                    if d_i in sundays: wo_c += 1
+                    if d_i in sundays: wo_c += 1 
                     else: h_c += 1
                 else:
                     if t_in >= time(13, 30):
@@ -87,22 +93,41 @@ def run_hr_engine(df, holidays, corrections):
         res_o.append({**row_o, "Total OT": tot_ot})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 3. SESSION & UI ---
-if 'auth' not in st.session_state: st.session_state.auth = False
-if 'profiles' not in st.session_state: st.session_state.profiles = []
-if 'corrs' not in st.session_state: st.session_state.corrs = []
-
+# --- 4. UI ---
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
-    if st.text_input("User ID") == "admin" and st.text_input("Password", type="password") == "orange_hr":
-        if st.button("Login"): st.session_state.auth = True; st.rerun()
+    u = st.text_input("User ID"); p = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if u == "admin" and p == "orange_hr": st.session_state.auth = True; st.rerun()
 else:
     mode = st.sidebar.radio("Navigation:", ["📊 Attendance", "👤 Employee Directory"])
     
     if mode == "📊 Attendance":
         file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
+        hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
+        menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "Correction"])
         if file:
-            m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), [], st.session_state.corrs)
-            st.dataframe(m)
-            
+            m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
+            if menu == "Muster": st.dataframe(m)
+            elif menu == "Summary": st.dataframe(s)
+            elif menu == "Correction":
+                with st.form("corr"):
+                    eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31)
+                    if st.form_submit_button("Add"): st.session_state.corrs.append({'id': eid, 'date': int(dt)})
+    
     elif mode == "👤 Employee Directory":
+        t1, t2, t3 = st.tabs(["➕ Add New Profile", "📋 Directory View", "⚙️ Export"])
+        with t1:
+            with st.form("emp_form", clear_on_submit=True):
+                c1, c2 = st.columns(2)
+                with c1:
+                    e_id = st.text_input("Employee ID *"); e_name = st.text_input("Full Name *"); e_cont = st.text_input("Contact *")
+                with c2:
+                    e_dept = st.text_input("Department"); e_status = st.selectbox("Status", ["Active", "Inactive"])
+                if st.form_submit_button("Save Profile"):
+                    st.session_state.profiles.append({"ID": e_id, "Name": e_name, "Dept": e_dept, "Status": e_status, "Contact": e_cont})
+                    st.success("Saved!"); st.rerun()
+        with t2:
+            if st.session_state.profiles: st.dataframe(pd.DataFrame(st.session_state.profiles))
+        with t3:
+            if st.session_state.profiles: st.download_button("Download CSV", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Directory.csv")
