@@ -137,7 +137,7 @@ else:
                 eid = st.text_input("Employee ID *")
                 name = st.text_input("Full Name *")
                # Gender default 'Male' (index 0)
-                    gen = st.selectbox("Gender *", ["Male", "Female", "Other"], index=0)
+                    gen = st.text_input("Gender *", ["Male", "Female", "Other"], index=0)
                dob = st.date_input("Date of Birth *")
                doj = st.date_input("Date of Joining *")
                 dept = st.text_input("Department")
