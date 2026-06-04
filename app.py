@@ -131,6 +131,7 @@ else:
                         st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
 
     else: # --- EMPLOYEE DIRECTORY ---
+        st.subheader("👤 Employee Directory")
         t1, t2 = st.tabs(["➕ Add/Update Profile", "📋 Directory / Filter / Delete"])
         with t1:
             with st.form("emp_form", clear_on_submit=True):
@@ -149,13 +150,14 @@ else:
         with t2:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                f_dept = st.multiselect("Filter by Dept:", df["Dept"].unique() if "Dept" in df.columns else [])
-                if f_dept: df = df[df["Dept"].isin(f_dept)]
+                # Safely handle filtering and deletion
+                if "Dept" in df.columns:
+                    f_dept = st.multiselect("Filter by Dept:", df["Dept"].unique())
+                    if f_dept: df = df[df["Dept"].isin(f_dept)]
                 st.dataframe(df, use_container_width=True)
-                
-                # DELETE LOGIC
-                del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
-                if st.button("Delete Selected Employee"):
-                    st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
-                    st.rerun()
+                if "ID" in df.columns:
+                    del_id = st.selectbox("Select ID to Delete:", [str(x) for x in df["ID"].unique()])
+                    if st.button("Delete Selected"):
+                        st.session_state.profiles = [p for p in st.session_state.profiles if str(p.get("ID")) != str(del_id)]
+                        st.rerun()
                 st.download_button("📥 Download CSV", df.to_csv(index=False), "Directory.csv")
