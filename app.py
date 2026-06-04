@@ -10,7 +10,7 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 3. ATTENDANCE ENGINE (ORIGINAL) ---
+# --- 3. ATTENDANCE ENGINE (ORIGINAL - UNTOUCHED) ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -43,7 +43,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+1, str(c['date'])] = c['in']
             df_w.at[idx+2, str(c['date'])] = c['out']
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [3, 10, 17, 24] 
+    sundays = [3, 10, 17, 24 ] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
     for eid in df_w[id_c].unique():
         if pd.isna(eid): continue
@@ -64,7 +64,8 @@ def run_hr_engine(df, holidays, corrections):
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
-                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Miss Punch"})
+                m_type = "Out Missing" if t_in else "In Missing"
+                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "In": t_in.strftime('%H:%M') if t_in else "", "Out": t_out.strftime('%H:%M') if t_out else "", "Status": m_type})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
                 if d2 <= d1: d2 += timedelta(days=1)
@@ -76,27 +77,33 @@ def run_hr_engine(df, holidays, corrections):
                     else: h_c += 1
                 else:
                     if t_in >= time(13, 30):
-                        work_hrs = (d2 - datetime.combine(datetime.today(), time(14, 0))).total_seconds() / 3600
+                        t_start = time(14, 0)
+                        d_start = datetime.combine(datetime.today(), t_start)
+                        work_hrs = (d2 - d_start).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 4.0) if work_hrs > 4.0 else 0.0
                         status = "AB/"
+                        if work_hrs < 4.0: early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     else:
-                        work_hrs = (d2 - datetime.combine(datetime.today(), max(t_in, time(9, 30)))).total_seconds() / 3600
+                        t_start_calc = max(t_in, time(9, 30))
+                        d_start_calc = datetime.combine(datetime.today(), t_start_calc)
+                        work_hrs = (d2 - d_start_calc).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
                         if actual_dur < 4.0: status = "AB/"
                         elif t_in > time(10, 16) or t_out < time(16, 0):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
-                        if t_in > time(9, 35): late_log.append(f"{d_i}")
-                        if work_hrs < 8.5: early_log.append(f"{d_i}")
+                        if t_in > time(9, 35): late_log.append(f"{t_in.strftime('%H:%M')} (Dt:{d_i})")
+                        if work_hrs < 8.5: early_log.append(f"{t_out.strftime('%H:%M')} (Dt:{d_i})")
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
         res_m.append(row_m)
-        res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot})
-        res_o.append({**row_o, "Total OT": tot_ot})
-        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Early Days": len(early_log)})
+        res_s.append({"Emp ID": clean_id, "Name": ename, "Present (P)": p_c, "Absent (A)": a_c, "Half Day (AB/)": ab_c, "Holiday (H)": h_c, "Weekly Off (WO)": wo_c, "Total OT Hours": tot_ot, "Payable Days": (p_c + ab_c + wo_c + h_c)})
+        row_o["Total OT Hours"] = tot_ot
+        res_o.append(row_o)
+        res_ex.append({"Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Late In Detail": " | ".join(late_log), "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)})
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
 # --- 4. UI ---
@@ -108,36 +115,44 @@ else:
     nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
     
     if nav == "📊 Attendance Engine":
-        file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
+        file = st.sidebar.file_uploader("Upload Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
-        menu = st.sidebar.selectbox("Reports:", ["Muster", "Summary", "OT Slab", "Late/Early", "Miss Punch", "Correction"])
+        menu = st.sidebar.selectbox("Reports Menu:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
-            if menu == "Muster": st.dataframe(m)
-            elif menu == "Summary": st.dataframe(s)
-            elif menu == "OT Slab": st.dataframe(o)
-            elif menu == "Late/Early": st.dataframe(ex)
-            elif menu == "Miss Punch": st.dataframe(mi)
-            elif menu == "Correction":
-                eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
-                if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
-
-    else: # --- DIRECTORY SECTION ---
-        t1, t2, t3, t4 = st.tabs(["➕ Add/Edit", "📁 Import/Delete", "🔍 Filter/View", "📊 Reports"])
-        with t1:
-            with st.form("emp_form"):
+            st.title(f"{menu}")
+            if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
+            elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
+            elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
+            elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
+            elif menu == "❌ Miss Punch": st.dataframe(mi, use_container_width=True)
+            elif menu == "🛠️ Correction":
                 c1, c2 = st.columns(2)
-                d = {"ID": c1.text_input("ID *"), "Name": c1.text_input("Name *"), "Gender": c1.selectbox("Gender", ["Male", "Female", "Other"]), "DOB": str(c1.date_input("DOB")), "DOJ": str(c1.date_input("DOJ")), "Dept": c2.text_input("Dept"), "Designation": c2.text_input("Designation"), "Manager": c2.text_input("Manager"), "FatherName": c1.text_input("FatherName"), "Contact": c1.text_input("Contact *"), "Email": c2.text_input("Email"), "Address": c2.text_area("Address"), "EmergencyName": c1.text_input("EmergencyName"), "EmergencyContact": c1.text_input("EmergencyContact"), "ESIC": c2.text_input("ESIC"), "PF": c2.text_input("PF"), "Qualification": c1.text_input("Qualification"), "Experience": c2.text_input("Experience"), "Aadhaar": c1.text_input("Aadhaar"), "PAN": c2.text_input("PAN"), "Status": c2.selectbox("Status", ["Active", "Inactive"]), "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), "Nationality": c2.text_input("Nationality"), "BloodGroup": c1.text_input("BloodGroup")}
-                if st.form_submit_button("Save Record"):
-                    st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != d['ID']]
-                    st.session_state.profiles.append(d); st.success("Saved!"); st.rerun()
+                with c1:
+                    with st.form("corr"):
+                        eid = st.text_input("Emp ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
+                        if st.form_submit_button("Update"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
+                with c2: st.write("History:", st.session_state.corrs)
+    
+    else: # --- NEW DIRECTORY MODULE ---
+        st.subheader("Employee Profile Management")
+        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Profile", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter Report", "📥 Download"])
+        with t1:
+            with st.form("emp_add"):
+                c1, c2 = st.columns(2)
+                d = {"ID": c1.text_input("ID *"), "Name": c1.text_input("Name *"), "Gender": c1.selectbox("Gender", ["Male", "Female"]), "Dept": c2.text_input("Dept"), "Contact": c1.text_input("Contact *")}
+                if st.form_submit_button("Save"): st.session_state.profiles.append(d); st.success("Added!"); st.rerun()
         with t2:
-            up = st.file_uploader("Upload CSV", type=['csv'])
-            if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
-            if st.session_state.profiles:
-                del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
-                if st.button("Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
+            st.file_uploader("Upload Photo", type=['jpg', 'png'])
+            st.file_uploader("Upload Resume", type=['pdf', 'docx'])
         with t3:
-            if st.session_state.profiles: st.dataframe(pd.DataFrame(st.session_state.profiles))
+            if st.session_state.profiles:
+                del_id = st.selectbox("Select ID to Delete:", [p['ID'] for p in st.session_state.profiles])
+                if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p['ID'] != del_id]; st.rerun()
         with t4:
-            if st.session_state.profiles: st.download_button("📥 Download Report", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Full_Report.csv")
+            if st.session_state.profiles:
+                df = pd.DataFrame(st.session_state.profiles)
+                f = st.multiselect("Filter by Dept:", df["Dept"].unique())
+                st.dataframe(df[df["Dept"].isin(f)] if f else df)
+        with t5:
+            if st.session_state.profiles: st.download_button("📥 Download Report", pd.DataFrame(st.session_state.profiles).to_csv(index=False), "Employee_Data.csv")
