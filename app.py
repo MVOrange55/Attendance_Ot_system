@@ -116,7 +116,7 @@ else:
     if nav == "📊 Attendance Engine":
         file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
-        menu = st.sidebar.selectbox("Reports:", [" 📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction""])
+        menu = st.sidebar.selectbox("Reports:", [" 📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
             if menu == "📊 Attendance Muster": st.dataframe(m)
