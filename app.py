@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
@@ -12,11 +13,10 @@ if 'profiles' not in st.session_state: st.session_state.profiles = []
 
 # --- 3. HELPER FUNCTION ---
 def get_pdf_download_link(df):
-    # HTML table convert karke download button dete hain
     html = df.to_html(index=False)
     return html
 
-# --- 4. ENGINE FUNCTIONS (ORIGINAL) ---
+# --- 4. ENGINE FUNCTIONS ---
 def parse_t(v):
     if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
     try:
@@ -130,7 +130,8 @@ else:
     
     else:
         st.subheader("Employee Profile Management")
-        t1, t2, t3, t4, t5 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter/Edit", "📥 Download"])
+        t1, t2, t3, t4, t5, t6 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter/Edit", "📥 Download", "ℹ️ Help"])
+        
         with t1:
             with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
@@ -149,21 +150,37 @@ else:
                 if st.form_submit_button("Save Record"):
                     if photo: data["Photo"] = photo.name
                     st.session_state.profiles.append(data); st.success("Record Saved Successfully!")
+        
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
-            if up: st.session_state.profiles.extend(pd.read_csv(up).to_dict('records')); st.rerun()
+            if up: 
+                df_up = pd.read_csv(up)
+                st.write("Preview Data:")
+                st.dataframe(df_up.head())
+                if st.button("Confirm & Upload"):
+                    st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
+        
         with t3:
             if st.session_state.profiles:
                 del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
                 if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
+        
         with t4:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 edited_df = st.data_editor(df, use_container_width=True)
                 if st.button("Save Changes"): st.session_state.profiles = edited_df.to_dict('records'); st.rerun()
+        
         with t5:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
-                # PDF ka link (Browser me open karke Print -> Save as PDF kar lo)
                 st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
+        
+        with t6:
+            st.subheader("System Documentation")
+            st.write("Employee data bulk mein upload karne ke liye, neeche diye gaye format ko follow karein:")
+            # Sample data generation
+            sample_data = pd.DataFrame([{"ID": "101", "Name": "Rahul Kumar", "Gender": "Male", "Dept": "IT", "Status": "Active"}])
+            st.download_button("📥 Download Sample CSV Format", sample_data.to_csv(index=False).encode('utf-8'), "employee_format.csv", "text/csv")
+            st.info("Ensure your CSV file contains these headers for successful bulk upload.")
