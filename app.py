@@ -107,7 +107,6 @@ res_ex.append({
             "Late Days": len(late_log), "Late In Detail": " | ".join(late_log),
             "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
         })
-    return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
 # --- 5. UI ---
 if not st.session_state.auth:
