@@ -102,14 +102,13 @@ def run_hr_engine(df, holidays, corrections):
         res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot})
         res_o.append({**row_o, "Total OT": tot_ot})
         
-     res_ex.append({
-    "Emp ID": clean_id, 
-    "Name": ename, 
-    "Late Days": len(late_log), 
-    "Late In Detail": " | ".join(late_log), # यहाँ अब तारीख और टाइम दिखेगा
-    "Early Out Days": len(early_log), 
-    "Early Out Detail ( < 8.5h )": " | ".join(early_log) # यहाँ आउट टाइम दिखेगा
-})
+ if t_in > time(9, 35): 
+                            if t_in is not None:
+                                late_log.append(f"{d_i}({t_in.strftime('%H:%M')})")
+                        
+                        if work_hrs < 8.5: 
+                            time_str = t_out.strftime('%H:%M') if t_out is not None else "N/A"
+                            early_log.append(f"{d_i}({time_str})")
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
 # --- 5. UI ---
