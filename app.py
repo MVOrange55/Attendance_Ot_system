@@ -116,16 +116,20 @@ else:
         file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
         menu = st.sidebar.selectbox("Reports:", [" 📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
+        
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
-            if menu == "📊 Attendance Muster": st.dataframe(m)
-            elif menu == "📈 Summary Report": st.dataframe(s)
-            elif menu == "💰 OT Slab Report": st.dataframe(o)
-            elif menu == "⚠️ Late/Early Log": st.dataframe(ex)
-            elif menu == "❌ Miss Punch": st.dataframe(mi)
-            elif menu == "🛠️ Correction":
-                eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
-                if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
+            
+            if m is not None:
+                if menu == " 📊 Attendance Muster": st.dataframe(m)
+                elif menu == "📈 Summary Report": st.dataframe(s)
+                elif menu == "💰 OT Slab Report": st.dataframe(o)
+                elif menu == "⚠️ Late/Early Log": st.dataframe(ex)
+                elif menu == "❌ Miss Punch": st.dataframe(mi)
+        
+        if menu == "🛠️ Correction":
+            eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
+            if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
     
     else:
         st.subheader("Employee Profile Management")
@@ -182,20 +186,12 @@ else:
             बल्क अपलोड (Bulk Upload) के लिए कृपया नीचे दी गई बटन से सैंपल CSV फाइल डाउनलोड करें। 
             सुनिश्चित करें कि आपकी CSV फाइल में निम्नलिखित हेडिंग्स (Headers) मौजूद हों:
             """)
-            
-            # सभी फील्ड्स के साथ खाली टेम्पलेट
             cols = ["ID", "Name", "Gender", "DOB", "DOJ", "Dept", "Contact", "PF", "Aadhaar", 
                     "Status", "Designation", "Manager", "FatherName", "Email", "Address", 
                     "EmergencyName", "EmergencyContact", "ESIC", "Qualification", "Experience", 
                     "PAN", "MaritalStatus", "Nationality", "BloodGroup"]
-            
             sample_df = pd.DataFrame(columns=cols)
-            st.download_button(
-                label="📥 Download Full Template CSV",
-                data=sample_df.to_csv(index=False).encode('utf-8'),
-                file_name="employee_template.csv",
-                mime="text/csv"
-            )
+            st.download_button("📥 Download Full Template CSV", sample_df.to_csv(index=False).encode('utf-8'), "employee_template.csv", "text/csv")
 
             st.warning("""
             **⚠️ ज़रूरी निर्देश:**
@@ -204,4 +200,3 @@ else:
             3. **Consistency:** हेडिंग्स के नाम वही रखें जो टेंप्लेट में दिए गए हैं, वरना डेटा इम्पोर्ट नहीं होगा।
             4. **Mobile/IDs:** मोबाइल नंबर और आधार जैसे कॉलम को एक्सेल में 'Text' फॉर्मेट में रखें ताकि वे वैज्ञानिक अंकन (Scientific Notation) में न बदलें।
             """)
-            
