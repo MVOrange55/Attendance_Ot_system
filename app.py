@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
@@ -178,9 +177,31 @@ else:
                 st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
         
         with t6:
-            st.subheader("System Documentation")
-            st.write("Employee data bulk mein upload karne ke liye, neeche diye gaye format ko follow karein:")
-            # Sample data generation
-            sample_data = pd.DataFrame([{"ID": "101", "Name": "Rahul Kumar", "Gender": "Male", "Dept": "IT", "Status": "Active"}])
-            st.download_button("📥 Download Sample CSV Format", sample_data.to_csv(index=False).encode('utf-8'), "employee_format.csv", "text/csv")
-            st.info("Ensure your CSV file contains these headers for successful bulk upload.")
+            st.subheader("ℹ️ System Help & CSV Guide")
+            st.markdown("""
+            बल्क अपलोड (Bulk Upload) के लिए कृपया नीचे दी गई बटन से सैंपल CSV फाइल डाउनलोड करें। 
+            सुनिश्चित करें कि आपकी CSV फाइल में निम्नलिखित हेडिंग्स (Headers) मौजूद हों:
+            """)
+            
+            # सभी फील्ड्स के साथ खाली टेम्पलेट
+            cols = ["ID", "Name", "Gender", "DOB", "DOJ", "Dept", "Contact", "PF", "Aadhaar", 
+                    "Status", "Designation", "Manager", "FatherName", "Email", "Address", 
+                    "EmergencyName", "EmergencyContact", "ESIC", "Qualification", "Experience", 
+                    "PAN", "MaritalStatus", "Nationality", "BloodGroup"]
+            
+            sample_df = pd.DataFrame(columns=cols)
+            st.download_button(
+                label="📥 Download Full Template CSV",
+                data=sample_df.to_csv(index=False).encode('utf-8'),
+                file_name="employee_template.csv",
+                mime="text/csv"
+            )
+
+            st.warning("""
+            **⚠️ ज़रूरी निर्देश:**
+            1. **Format:** फाइल हमेशा CSV (comma-separated) फॉर्मेट में होनी चाहिए।
+            2. **Dates:** जन्म तिथि और जॉइनिंग तिथि के लिए `YYYY-MM-DD` फॉर्मेट का प्रयोग करें।
+            3. **Consistency:** हेडिंग्स के नाम वही रखें जो टेंप्लेट में दिए गए हैं, वरना डेटा इम्पोर्ट नहीं होगा।
+            4. **Mobile/IDs:** मोबाइल नंबर और आधार जैसे कॉलम को एक्सेल में 'Text' फॉर्मेट में रखें ताकि वे वैज्ञानिक अंकन (Scientific Notation) में न बदलें।
+            """)
+            
