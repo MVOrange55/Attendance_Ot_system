@@ -69,7 +69,7 @@ def run_hr_engine(df, holidays, corrections):
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
-                m_type = "Out Missing" if t_in else "In Missing"
+              
                 res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Miss Punch"})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
