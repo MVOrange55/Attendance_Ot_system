@@ -92,21 +92,27 @@ def run_hr_engine(df, holidays, corrections):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
-                        if t_in > time(9, 35): late_log.append(f"{d_i}")
-                        if work_hrs < 8.5: early_log.append(f"{d_i}")
+                        
+                        # Safe Logging
+                        if t_in is not None and t_in > time(9, 35):
+                            late_log.append(f"{d_i}({t_in.strftime('%H:%M')})")
+                        if work_hrs < 8.5:
+                            out_str = t_out.strftime('%H:%M') if t_out is not None else "N/A"
+                            early_log.append(f"{d_i}({out_str})")
+                            
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
         res_m.append(row_m)
         res_s.append({"Emp ID": clean_id, "Name": ename, "P": p_c, "A": a_c, "AB/": ab_c, "H": h_c, "WO": wo_c, "OT": tot_ot})
-        res_o.append({**row_o, "Total OT": tot_ot})
-        
+        row_o["Total OT"] = tot_ot
+        res_o.append(row_o)
         res_ex.append({
             "Emp ID": clean_id, "Name": ename, 
             "Late Days": len(late_log), "Late In Detail": " | ".join(late_log),
             "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
-        })   
+        })
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
 # --- 5. UI ---
@@ -121,17 +127,14 @@ else:
         file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
         menu = st.sidebar.selectbox("Reports:", [" 📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
-        
         if file:
             m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
-            
             if m is not None:
                 if menu == " 📊 Attendance Muster": st.dataframe(m)
                 elif menu == "📈 Summary Report": st.dataframe(s)
                 elif menu == "💰 OT Slab Report": st.dataframe(o)
                 elif menu == "⚠️ Late/Early Log": st.dataframe(ex)
                 elif menu == "❌ Miss Punch": st.dataframe(mi)
-        
         if menu == "🛠️ Correction":
             eid = st.text_input("ID"); dt = st.number_input("Date", 1, 31); cin = st.text_input("IN"); cout = st.text_input("OUT")
             if st.button("Add Correction"): st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout}); st.rerun()
@@ -139,69 +142,32 @@ else:
     else:
         st.subheader("Employee Profile Management")
         t1, t2, t3, t4, t5, t6 = st.tabs(["➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", "🔍 Filter/Edit", "📥 Download", "ℹ️ Help"])
-        
         with t1:
             with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                data = {
-                    "ID": c1.text_input("ID"), "Name": c1.text_input("Name"), "Gender": c1.selectbox("Gender", ["Male", "Female"]),
-                    "DOB": str(c1.date_input("DOB")), "DOJ": str(c1.date_input("DOJ")), "Dept": c2.text_input("Dept"),
-                    "Contact": c1.text_input("Contact (Max 10)", max_chars=10), "PF": c2.text_input("PF (Max 12)", max_chars=12),
-                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), "Status": c2.selectbox("Status", ["Active", "Inactive"]),
-                    "Designation": c2.text_input("Designation"), "Manager": c2.text_input("Manager"), "FatherName": c1.text_input("FatherName"), 
-                    "Email": c2.text_input("Email"), "Address": c2.text_area("Address"), "EmergencyName": c1.text_input("EmergencyName"), 
-                    "EmergencyContact": c1.text_input("EmergencyContact"), "ESIC": c2.text_input("ESIC"), "Qualification": c1.text_input("Qualification"), 
-                    "Experience": c2.text_input("Experience"), "PAN": c2.text_input("PAN"), "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), 
-                    "Nationality": c2.text_input("Nationality"), "BloodGroup": c1.text_input("BloodGroup")
-                }
+                data = {"ID": c1.text_input("ID"), "Name": c1.text_input("Name"), "Gender": c1.selectbox("Gender", ["Male", "Female"]), "DOB": str(c1.date_input("DOB")), "DOJ": str(c1.date_input("DOJ")), "Dept": c2.text_input("Dept"), "Contact": c1.text_input("Contact (Max 10)", max_chars=10), "PF": c2.text_input("PF (Max 12)", max_chars=12), "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), "Status": c2.selectbox("Status", ["Active", "Inactive"]), "Designation": c2.text_input("Designation"), "Manager": c2.text_input("Manager"), "FatherName": c1.text_input("FatherName"), "Email": c2.text_input("Email"), "Address": c2.text_area("Address"), "EmergencyName": c1.text_input("EmergencyName"), "EmergencyContact": c1.text_input("EmergencyContact"), "ESIC": c2.text_input("ESIC"), "Qualification": c1.text_input("Qualification"), "Experience": c2.text_input("Experience"), "PAN": c2.text_input("PAN"), "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), "Nationality": c2.text_input("Nationality"), "BloodGroup": c1.text_input("BloodGroup")}
                 photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
                 if st.form_submit_button("Save Record"):
                     if photo: data["Photo"] = photo.name
                     st.session_state.profiles.append(data); st.success("Record Saved Successfully!")
-        
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: 
                 df_up = pd.read_csv(up)
-                st.write("Preview Data:")
-                st.dataframe(df_up.head())
-                if st.button("Confirm & Upload"):
-                    st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
-        
+                if st.button("Confirm & Upload"): st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
         with t3:
             if st.session_state.profiles:
                 del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
                 if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
-        
         with t4:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 edited_df = st.data_editor(df, use_container_width=True)
                 if st.button("Save Changes"): st.session_state.profiles = edited_df.to_dict('records'); st.rerun()
-        
         with t5:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
                 st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
-        
         with t6:
-            st.subheader("ℹ️ System Help & CSV Guide")
-            st.markdown("""
-            बल्क अपलोड (Bulk Upload) के लिए कृपया नीचे दी गई बटन से सैंपल CSV फाइल डाउनलोड करें। 
-            सुनिश्चित करें कि आपकी CSV फाइल में निम्नलिखित हेडिंग्स (Headers) मौजूद हों:
-            """)
-            cols = ["ID", "Name", "Gender", "DOB", "DOJ", "Dept", "Contact", "PF", "Aadhaar", 
-                    "Status", "Designation", "Manager", "FatherName", "Email", "Address", 
-                    "EmergencyName", "EmergencyContact", "ESIC", "Qualification", "Experience", 
-                    "PAN", "MaritalStatus", "Nationality", "BloodGroup"]
-            sample_df = pd.DataFrame(columns=cols)
-            st.download_button("📥 Download Full Template CSV", sample_df.to_csv(index=False).encode('utf-8'), "employee_template.csv", "text/csv")
-
-            st.warning("""
-            **⚠️ ज़रूरी निर्देश:**
-            1. **Format:** फाइल हमेशा CSV (comma-separated) फॉर्मेट में होनी चाहिए।
-            2. **Dates:** जन्म तिथि और जॉइनिंग तिथि के लिए `YYYY-MM-DD` फॉर्मेट का प्रयोग करें।
-            3. **Consistency:** हेडिंग्स के नाम वही रखें जो टेंप्लेट में दिए गए हैं, वरना डेटा इम्पोर्ट नहीं होगा।
-            4. **Mobile/IDs:** मोबाइल नंबर और आधार जैसे कॉलम को एक्सेल में 'Text' फॉर्मेट में रखें ताकि वे वैज्ञानिक अंकन (Scientific Notation) में न बदलें।
-            """)
+            st.warning("Ensure CSV headers match the template.")
