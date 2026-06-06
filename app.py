@@ -69,8 +69,8 @@ def run_hr_engine(df, holidays, corrections):
                 else: status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
-              
-                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Miss Punch"})
+                miss_type = "OUT Punch Missing" if t_in else "IN Punch Missing"
+                res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Miss Punch", "Detail": miss_type})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
                 if d2 <= d1: d2 += timedelta(days=1)
@@ -93,14 +93,11 @@ def run_hr_engine(df, holidays, corrections):
                             if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
                             else: status = "AB/"
                         else: status = "P"
-                        
-                        # Safe Logging
                         if t_in is not None and t_in > time(9, 35):
                             late_log.append(f"{d_i}({t_in.strftime('%H:%M')})")
                         if work_hrs < 8.5:
                             out_str = t_out.strftime('%H:%M') if t_out is not None else "N/A"
                             early_log.append(f"{d_i}({out_str})")
-                            
                     if status in ["P", "P*"]: p_c += 1
                     elif status == "AB/": ab_c += 0.5
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
@@ -110,8 +107,7 @@ def run_hr_engine(df, holidays, corrections):
         row_o["Total OT"] = tot_ot
         res_o.append(row_o)
         res_ex.append({
-            "Emp ID": clean_id, "Name": ename, 
-            "Late Days": len(late_log), "Late In Detail": " | ".join(late_log),
+            "Emp ID": clean_id, "Name": ename, "Late Days": len(late_log), "Late In Detail": " | ".join(late_log),
             "Early Out Days": len(early_log), "Early Out Detail ( < 8.5h )": " | ".join(early_log)
         })
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
