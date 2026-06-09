@@ -176,9 +176,6 @@ else:
             st.subheader("Search & Filter Employees")
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                # Serial Number column add karna
-                df.insert(0, 'Sr. No.', range(1, len(df) + 1))
-                
                 c1, c2, c3 = st.columns(3)
                 dept_list = df['Dept'].unique().tolist() if 'Dept' in df.columns else []
                 desig_list = df['Designation'].unique().tolist() if 'Designation' in df.columns else []
@@ -194,10 +191,11 @@ else:
                     filt = filt[filt['Name'].astype(str).str.contains(search_term, case=False) | 
                                 filt['ID'].astype(str).str.contains(search_term)]
 
+                # Dynamic Sr. No. logic
+                filt.insert(0, 'Sr. No.', range(1, len(filt) + 1))
                 edited_df = st.data_editor(filt, use_container_width=True, num_rows="dynamic")
                 
                 if st.button("💾 Save All Changes", use_container_width=True):
-                    # Sr. No column hata kar save karna
                     if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
                     st.session_state.profiles = edited_df.to_dict('records')
                     st.success("Changes saved!")
