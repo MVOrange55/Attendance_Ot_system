@@ -150,8 +150,17 @@ else:
         with t2:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: 
-                df_up = pd.read_csv(up)
-                if st.button("Confirm & Upload"): st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
+                try:
+                    # Encoding fix aur empty handling ke saath
+                    df_up = pd.read_csv(up, encoding='utf-8-sig')
+                    df_up = df_up.dropna(how='all')
+                    df_up = df_up.fillna('')
+                    st.write("Preview:")
+                    st.dataframe(df_up.head())
+                    if st.button("Confirm & Upload"): 
+                        st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
+                except Exception as e:
+                    st.error(f"Error reading file: {e}")
         with t3:
             if st.session_state.profiles:
                 del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
