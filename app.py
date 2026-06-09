@@ -163,14 +163,22 @@ else:
                 except Exception as e:
                     st.error(f"Error reading file: {e}")
         with t3:
+            st.subheader("Batch Delete Employees")
             if st.session_state.profiles:
-                del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
-                if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
+                options = {f"{p.get('ID')} - {p.get('Name')}": p.get('ID') for p in st.session_state.profiles}
+                del_ids = st.multiselect("Select Employees to Delete:", options=list(options.keys()))
+                if st.button("Confirm Delete Selected", type="primary"):
+                    selected_ids = [options[k] for k in del_ids]
+                    st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') not in selected_ids]
+                    st.success("Selected records deleted!")
+                    st.rerun()
         with t4:
             st.subheader("Search & Filter Employees")
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                # Filtering section
+                # Serial Number column add karna
+                df.insert(0, 'Sr. No.', range(1, len(df) + 1))
+                
                 c1, c2, c3 = st.columns(3)
                 dept_list = df['Dept'].unique().tolist() if 'Dept' in df.columns else []
                 desig_list = df['Designation'].unique().tolist() if 'Designation' in df.columns else []
@@ -179,7 +187,6 @@ else:
                 desig_filter = c2.multiselect("Filter by Designation:", desig_list)
                 search_term = c3.text_input("🔍 Quick Find:", placeholder="Type name or ID...")
 
-                # Apply logic
                 filt = df.copy()
                 if dept_filter: filt = filt[filt['Dept'].isin(dept_filter)]
                 if desig_filter: filt = filt[filt['Designation'].isin(desig_filter)]
@@ -190,7 +197,8 @@ else:
                 edited_df = st.data_editor(filt, use_container_width=True, num_rows="dynamic")
                 
                 if st.button("💾 Save All Changes", use_container_width=True):
-                    # Update back to main state
+                    # Sr. No column hata kar save karna
+                    if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
                     st.session_state.profiles = edited_df.to_dict('records')
                     st.success("Changes saved!")
                     st.rerun()
