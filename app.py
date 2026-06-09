@@ -167,10 +167,35 @@ else:
                 del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
                 if st.button("Confirm Delete"): st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') != del_id]; st.rerun()
         with t4:
+            st.subheader("Search & Filter Employees")
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                edited_df = st.data_editor(df, use_container_width=True)
-                if st.button("Save Changes"): st.session_state.profiles = edited_df.to_dict('records'); st.rerun()
+                # Filtering section
+                c1, c2, c3 = st.columns(3)
+                dept_list = df['Dept'].unique().tolist() if 'Dept' in df.columns else []
+                desig_list = df['Designation'].unique().tolist() if 'Designation' in df.columns else []
+                
+                dept_filter = c1.multiselect("Filter by Dept:", dept_list)
+                desig_filter = c2.multiselect("Filter by Designation:", desig_list)
+                search_term = c3.text_input("🔍 Quick Find:", placeholder="Type name or ID...")
+
+                # Apply logic
+                filt = df.copy()
+                if dept_filter: filt = filt[filt['Dept'].isin(dept_filter)]
+                if desig_filter: filt = filt[filt['Designation'].isin(desig_filter)]
+                if search_term:
+                    filt = filt[filt['Name'].astype(str).str.contains(search_term, case=False) | 
+                                filt['ID'].astype(str).str.contains(search_term)]
+
+                edited_df = st.data_editor(filt, use_container_width=True, num_rows="dynamic")
+                
+                if st.button("💾 Save All Changes", use_container_width=True):
+                    # Update back to main state
+                    st.session_state.profiles = edited_df.to_dict('records')
+                    st.success("Changes saved!")
+                    st.rerun()
+            else:
+                st.info("No employee profiles found.")
         with t5:
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
