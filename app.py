@@ -151,16 +151,21 @@ else:
             up = st.file_uploader("Upload CSV", type=['csv'])
             if up: 
                 try:
-                    # Encoding fix aur empty handling ke saath
-                    df_up = pd.read_csv(up, encoding='utf-8-sig')
+                    # FIX: Yahan encoding change ki hai
+                    df_up = pd.read_csv(up, encoding='latin1')
+                    # Khali rows hatane aur handle karne ke liye:
                     df_up = df_up.dropna(how='all')
                     df_up = df_up.fillna('')
+                    
                     st.write("Preview:")
                     st.dataframe(df_up.head())
+                    
                     if st.button("Confirm & Upload"): 
-                        st.session_state.profiles.extend(df_up.to_dict('records')); st.success("Data Imported!"); st.rerun()
+                        st.session_state.profiles.extend(df_up.to_dict('records'))
+                        st.success("Data Imported Successfully!")
+                        st.rerun()
                 except Exception as e:
-                    st.error(f"Error reading file: {e}")
+                    st.error(f"Error reading file: {e}. Try saving your CSV as 'UTF-8' in Excel.")
         with t3:
             if st.session_state.profiles:
                 del_id = st.selectbox("Delete ID:", [p.get('ID') for p in st.session_state.profiles])
