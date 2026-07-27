@@ -127,6 +127,7 @@ if not st.session_state.auth:
                 st.session_state.auth = True
                 st.rerun() # Sirf login success hone par rerun karega
             else:
+                st.error("Invalid Credentials")
                 
     nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
     
