@@ -116,7 +116,7 @@ def run_hr_engine(df, holidays, corrections):
 if not st.session_state.auth:
     st.markdown("<h1 style='text-align: center; color: #f97316;'>Orange House HR Portal</h1>", unsafe_allow_html=True)
     u = st.text_input("User ID"); p = st.text_input("Password", type="password")
-    if st.button("Login") and u == "admin" and p == "hr": st.session_state.auth = True; st.rerun()
+    if st.button("Login") and u == "admin" and p == "Hr": st.session_state.auth = True; st.rerun()
 else:
                 
     nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
