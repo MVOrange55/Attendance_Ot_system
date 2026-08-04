@@ -48,7 +48,7 @@ def run_hr_engine(df, holidays, corrections):
             df_w.at[idx+1, str(c['date'])] = c['in']
             df_w.at[idx+2, str(c['date'])] = c['out']
     dates = [c for c in df_w.columns if str(c).replace('.0','').strip().isdigit()]
-    sundays = [5, 12, 19, 26] 
+    sundays = [2, 09, 16, 23, 30] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
     for eid in df_w[id_c].unique():
         if pd.isna(eid): continue
