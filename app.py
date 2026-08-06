@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
-import json
 import requests
 
 # --- LOTTIE ANIMATION HELPER ---
@@ -14,9 +13,11 @@ except ImportError:
 def load_lottieurl(url: str):
     try:
         r = requests.get(url, timeout=3)
-        if r.status_code != 200: return None
+        if r.status_code != 200:
+            return None
         return r.json()
-    except: return None
+    except Exception:
+        return None
 
 # Load Login Animation JSON
 lottie_login_json = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_kvwa8b2v.json") if HAS_LOTTIE else None
@@ -155,36 +156,51 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. SESSION STATE ---
-if 'auth' not in st.session_state: st.session_state.auth = False
-if 'corrs' not in st.session_state: st.session_state.corrs = []
-if 'profiles' not in st.session_state: st.session_state.profiles = []
+if 'auth' not in st.session_state:
+    st.session_state.auth = False
+if 'corrs' not in st.session_state:
+    st.session_state.corrs = []
+if 'profiles' not in st.session_state:
+    st.session_state.profiles = []
 
 # --- 4. HELPER & ENGINE FUNCTIONS ---
 def get_pdf_download_link(df):
     return df.to_html(index=False)
 
 def parse_t(v):
-    if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']: return None
+    if pd.isna(v) or str(v).strip() in ['', 'nan', '00:00']:
+        return None
     try:
         s = str(v).strip()
-        if ':' in s: return datetime.strptime(s[:5], '%H:%M').time()
+        if ':' in s:
+            return datetime.strptime(s[:5], '%H:%M').time()
         return (datetime(1900, 1, 1) + timedelta(days=float(s))).time()
-    except: return None
+    except Exception:
+        return None
 
 def get_slab_ot(extra_hrs):
-    if extra_hrs < 0.25: return 0.0
+    if extra_hrs < 0.25:
+        return 0.0
     h = int(extra_hrs)
     m = round((extra_hrs - h) * 60)
-    if 15 <= m < 27: slab = 0.00
-    elif 29 <= m < 43: slab = 0.50
-    elif 44 <= m < 57: slab = 0.75
-    elif 59 <= m < 60: slab = 1.0
-    elif m >= 60: h += 1; slab = 0.0
-    else: slab = 0.0
+    if 15 <= m < 27:
+        slab = 0.00
+    elif 29 <= m < 43:
+        slab = 0.50
+    elif 44 <= m < 57:
+        slab = 0.75
+    elif 59 <= m < 60:
+        slab = 1.0
+    elif m >= 60:
+        h += 1
+        slab = 0.0
+    else:
+        slab = 0.0
     return float(h + slab)
 
 def run_hr_engine(df, holidays, corrections):
-    if df is None or df.empty: return None, None, None, None, None
+    if df is None or df.empty:
+        return None, None, None, None, None
     df_w = df.copy()
     id_c, name_c = df_w.columns[0], df_w.columns[1]
     df_w[id_c], df_w[name_c] = df_w[id_c].ffill(), df_w[name_c].ffill()
@@ -198,7 +214,8 @@ def run_hr_engine(df, holidays, corrections):
     sundays = [2, 9, 16, 23, 30] 
     res_m, res_s, res_o, res_ex, res_mi = [], [], [], [], []
     for eid in df_w[id_c].unique():
-        if pd.isna(eid): continue
+        if pd.isna(eid):
+            continue
         clean_id = str(int(float(eid))) if '.' in str(eid) else str(eid).replace(':', '')
         block = df_w[df_w[id_c] == eid].reset_index(drop=True)
         ename = str(block.iloc[0][name_c])
@@ -211,22 +228,28 @@ def run_hr_engine(df, holidays, corrections):
             status, day_ot = "A", 0.0
             is_off_day = d_i in holidays or d_i in sundays
             if not t_in and not t_out:
-                if d_i in sundays: status, wo_c = "WO", wo_c + 1
-                elif d_i in holidays: status, h_c = "H", h_c + 1
-                else: status, a_c = "A", a_c + 1
+                if d_i in sundays:
+                    status, wo_c = "WO", wo_c + 1
+                elif d_i in holidays:
+                    status, h_c = "H", h_c + 1
+                else:
+                    status, a_c = "A", a_c + 1
             elif (t_in and not t_out) or (not t_in and t_out):
                 status, a_c = "A", a_c + 1
                 miss_type = "OUT Punch Missing" if t_in else "IN Punch Missing"
                 res_mi.append({"ID": clean_id, "Name": ename, "Date": d_i, "Status": "Miss Punch", "Detail": miss_type})
             else:
                 d1, d2 = datetime.combine(datetime.today(), t_in), datetime.combine(datetime.today(), t_out)
-                if d2 <= d1: d2 += timedelta(days=1)
+                if d2 <= d1:
+                    d2 += timedelta(days=1)
                 actual_dur = (d2 - d1).total_seconds() / 3600
                 if is_off_day:
                     status = "WO" if d_i in sundays else "H"
                     day_ot = get_slab_ot(actual_dur)
-                    if d_i in sundays: wo_c += 1 
-                    else: h_c += 1
+                    if d_i in sundays:
+                        wo_c += 1 
+                    else:
+                        h_c += 1
                 else:
                     if t_in >= time(13, 30):
                         work_hrs = (d2 - datetime.combine(datetime.today(), time(14, 0))).total_seconds() / 3600
@@ -235,18 +258,24 @@ def run_hr_engine(df, holidays, corrections):
                     else:
                         work_hrs = (d2 - datetime.combine(datetime.today(), max(t_in, time(9, 30)))).total_seconds() / 3600
                         day_ot = get_slab_ot(work_hrs - 8.5) if work_hrs > 8.5 else 0.0
-                        if actual_dur < 4.0: status = "AB/"
+                        if actual_dur < 4.0:
+                            status = "AB/"
                         elif t_in > time(10, 16) or t_out < time(16, 0):
-                            if not sl_used and actual_dur >= 6.0: status, sl_used = "P*", True
-                            else: status = "AB/"
-                        else: status = "P"
+                            if not sl_used and actual_dur >= 6.0:
+                                status, sl_used = "P*", True
+                            else:
+                                status = "AB/"
+                        else:
+                            status = "P"
                         if t_in is not None and t_in > time(9, 35):
                             late_log.append(f"{d_i}({t_in.strftime('%H:%M')})")
                         if work_hrs < 8.5:
                             out_str = t_out.strftime('%H:%M') if t_out is not None else "N/A"
                             early_log.append(f"{d_i}({out_str})")
-                    if status in ["P", "P*"]: p_c += 1
-                    elif status == "AB/": ab_c += 0.5
+                    if status in ["P", "P*"]:
+                        p_c += 1
+                    elif status == "AB/":
+                        ab_c += 0.5
             row_m[str(d_i)], row_o[str(d_i)] = status, day_ot
             tot_ot += day_ot
         res_m.append(row_m)
@@ -338,11 +367,16 @@ else:
             
             if m is not None:
                 st.subheader(f"Output Matrix: {menu.strip()}")
-                if menu == " 📊 Attendance Muster": st.dataframe(m, use_container_width=True)
-                elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
-                elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
-                elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
-                elif menu == "❌ Miss Punch": st.dataframe(mi, use_container_width=True)
+                if menu == " 📊 Attendance Muster":
+                    st.dataframe(m, use_container_width=True)
+                elif menu == "📈 Summary Report":
+                    st.dataframe(s, use_container_width=True)
+                elif menu == "💰 OT Slab Report":
+                    st.dataframe(o, use_container_width=True)
+                elif menu == "⚠️ Late/Early Log":
+                    st.dataframe(ex, use_container_width=True)
+                elif menu == "❌ Miss Punch":
+                    st.dataframe(mi, use_container_width=True)
         else:
             st.info("👈 Upload an Excel dataset via sidebar control panel to generate live workforce calculations.")
 
@@ -415,7 +449,8 @@ else:
                 }
                 photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
                 if st.form_submit_button("Save Record", use_container_width=True):
-                    if photo: data["Photo"] = photo.name
+                    if photo:
+                        data["Photo"] = photo.name
                     st.session_state.profiles.append(data)
                     st.success("Record Saved Successfully!")
 
@@ -438,15 +473,3 @@ else:
             if st.session_state.profiles:
                 options = {f"{p.get('ID')} - {p.get('Name')}": p.get('ID') for p in st.session_state.profiles}
                 del_ids = st.multiselect("Select Employees to Delete:", options=list(options.keys()))
-                if st.button("Confirm Delete Selected", type="primary"):
-                    selected_ids = [options[k] for k in del_ids]
-                    st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') not in selected_ids]
-                    st.success("Selected records deleted!")
-                    st.rerun()
-            else:
-                st.info("No employee profiles found.")
-
-        with t4:
-            st.subheader("Search & Filter Employees")
-            if st.session_state.profiles:
-                df = pd.DataFrame(st.sessio
