@@ -264,7 +264,6 @@ if not st.session_state.auth:
     c1, c2 = st.columns([1.1, 1])
     
     with c1:
-        # Animated Lottie on Login Left Side
         if HAS_LOTTIE and lottie_login_json:
             st_lottie(lottie_login_json, height=360, key="login_animation")
         else:
@@ -449,4 +448,5 @@ else:
 
         with t4:
             st.subheader("Search & Filter Employees")
-            if st.session_state.profiles
+            if st.session_state.profiles:
+                df = pd.DataFrame(st.sessio
