@@ -10,128 +10,116 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM MODERN STYLING (CSS) ---
+# --- HIGH-CONTRAST & HIGH-VISIBILITY CSS ---
 st.markdown("""
 <style>
-    /* Main Background & Fonts */
+    /* Main Background & Base Text */
     .stApp {
-        background-color: #FAFAFA;
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    
-    /* Primary Accent Styling */
-    :root {
-        --primary-color: #F97316;
-        --primary-dark: #EA580C;
-        --bg-card: #FFFFFF;
+
+    /* Force Dark Text on Light Background for High Contrast */
+    p, label, span, div, h1, h2, h3, h4, h5, h6 {
+        color: #0F172A !important;
     }
 
-    /* Headings */
-    h1, h2, h3 {
-        color: #1E293B !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Custom Header Card */
+    /* Main Orange Banner Header */
     .brand-header {
-        background: linear-gradient(135deg, #FF8C00 0%, #F97316 100%);
-        padding: 24px;
-        border-radius: 16px;
-        color: white;
+        background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%);
+        padding: 22px 28px;
+        border-radius: 14px;
         margin-bottom: 25px;
-        box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.3);
+        box-shadow: 0 4px 15px rgba(234, 88, 12, 0.25);
     }
     .brand-header h1 {
-        color: white !important;
+        color: #FFFFFF !important;
         margin: 0;
         font-size: 2rem;
+        font-weight: 800 !important;
     }
     .brand-header p {
-        margin: 5px 0 0 0;
-        opacity: 0.9;
+        color: #FFEDD5 !important;
+        margin: 4px 0 0 0;
         font-size: 0.95rem;
     }
 
-    /* Login Box Glassmorphism */
-    .login-container {
-        max-width: 420px;
-        margin: 60px auto;
-        padding: 40px;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.01);
-        border: 1px solid #F1F5F9;
-        text-align: center;
-    }
-
-    /* Styled Buttons */
-    .stButton > button {
-        border-radius: 10px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
-        border: none !important;
-    }
-    
-    /* Primary Button Styling */
-    div[data-testid="stFormSubmitButton"] > button, .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #F97316 0%, #EA580C 100%) !important;
-        color: white !important;
-        box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25) !important;
-    }
-    
-    div[data-testid="stFormSubmitButton"] > button:hover, .stButton > button[kind="primary"]:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35) !important;
-    }
-
-    /* Input Fields */
-    .stTextInput input, .stSelectbox select, .stNumberInput input {
+    /* Input Fields, Text Areas & Select Boxes - Clear Dark Text & Solid Borders */
+    .stTextInput input, .stSelectbox > div, .stNumberInput input, .stTextArea textarea {
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        border: 1.5px solid #94A3B8 !important;
         border-radius: 8px !important;
-        border: 1px solid #CBD5E1 !important;
+        font-weight: 500 !important;
     }
-    .stTextInput input:focus, .stSelectbox select:focus {
-        border-color: #F97316 !important;
-        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2) !important;
+    
+    .stTextInput input:focus, .stSelectbox > div:focus, .stTextArea textarea:focus {
+        border-color: #EA580C !important;
+        box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25) !important;
     }
 
-    /* Sidebar Clean Styling */
-    section[data-testid="stSidebar"] {
+    /* Buttons Styling (High Contrast) */
+    .stButton > button {
         background-color: #1E293B !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: none !important;
+        padding: 8px 16px !important;
+        transition: all 0.2s ease !important;
     }
-    section[data-testid="stSidebar"] * {
+    .stButton > button:hover {
+        background-color: #0F172A !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Primary / Submit Buttons */
+    div[data-testid="stFormSubmitButton"] > button, .stButton > button[kind="primary"] {
+        background-color: #EA580C !important;
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3) !important;
+    }
+    div[data-testid="stFormSubmitButton"] > button:hover, .stButton > button[kind="primary"]:hover {
+        background-color: #C2410C !important;
+    }
+
+    /* Sidebar High-Contrast Fix */
+    section[data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+    }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p {
         color: #F8FAFC !important;
     }
-    section[data-testid="stSidebar"] .stRadio label {
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-bottom: 4px;
-    }
-    
-    /* Tabs Styling */
+
+    /* Tabs - High Contrast Active/Inactive State */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #F1F5F9;
-        padding: 6px;
-        border-radius: 12px;
+        background-color: #E2E8F0 !important;
+        border-radius: 10px;
+        padding: 5px;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 8px !important;
-        padding: 8px 16px !important;
-        font-weight: 600 !important;
-        color: #64748B !important;
-        border: none !important;
+        color: #475569 !important;
+        font-weight: 700 !important;
+        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #FFFFFF !important;
-        color: #F97316 !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+        color: #EA580C !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
     }
 
-    /* Data Editor / Dataframes */
+    /* Dataframe Table Container */
     .stDataFrame {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #E2E8F0;
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 10px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -167,7 +155,6 @@ def get_slab_ot(extra_hrs):
     else: slab = 0.0
     return float(h + slab)
 
-# Fast Calculation via Caching
 @st.cache_data(show_spinner=False)
 def run_hr_engine(df, holidays, corrections):
     if df is None or df.empty: return None, None, None, None, None
@@ -245,23 +232,22 @@ def run_hr_engine(df, holidays, corrections):
         })
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 5. UI APP FLOW ---
+# --- 5. UI FLOW ---
 if not st.session_state.auth:
-    # Modern Login Layout
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
             <div style='text-align: center; margin-bottom: 20px;'>
-                <span style='font-size: 64px;'>🍊</span>
-                <h2 style='margin-top: 10px; font-weight: 800; color: #1E293B;'>Orange House</h2>
-                <p style='color: #64748B;'>Enterprise HR Management Portal</p>
+                <span style='font-size: 60px;'>🍊</span>
+                <h2 style='margin-top: 10px; font-weight: 800;'>Orange House</h2>
+                <p style='color: #475569 !important;'>HR Portal Login</p>
             </div>
         """, unsafe_allow_html=True)
         
         with st.form("login_form"):
-            st.subheader("Sign In")
-            u = st.text_input("User ID", placeholder="Enter your username")
+            st.subheader("Admin Sign In")
+            u = st.text_input("User ID", placeholder="Enter username")
             p = st.text_input("Password", type="password", placeholder="••••••••")
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("Login to Portal", use_container_width=True)
@@ -273,21 +259,21 @@ if not st.session_state.auth:
                 else:
                     st.error("Invalid Username or Password")
 else:
-    # Sidebar Header Branding
+    # Sidebar
     st.sidebar.markdown("""
         <div style='padding: 10px 0px 20px 0px; text-align: center;'>
-            <h2 style='color: #F97316 !important; margin: 0;'>🍊 Orange House</h2>
-            <span style='font-size: 0.8rem; color: #94A3B8;'>HR Operations Suite</span>
+            <h2 style='color: #EA580C !important; margin: 0;'>🍊 Orange House</h2>
+            <span style='font-size: 0.85rem; color: #CBD5E1 !important;'>HR Management System</span>
         </div>
     """, unsafe_allow_html=True)
     
-    nav = st.sidebar.radio("Navigation", ["📊 Attendance Engine", "👤 Employee Directory"])
+    nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
     st.sidebar.markdown("---")
     if st.sidebar.button("🔒 Logout", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
-    # Main Top Banner
+    # Top Banner Header
     st.markdown("""
         <div class="brand-header">
             <h1>Orange House HR Portal</h1>
@@ -296,18 +282,18 @@ else:
     """, unsafe_allow_html=True)
     
     if nav == "📊 Attendance Engine":
-        st.sidebar.markdown("### ⚙️ Engine Settings")
+        st.sidebar.markdown("### ⚙️ Engine Options")
         file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
-        menu = st.sidebar.selectbox("Select Report View:", ["📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
+        menu = st.sidebar.selectbox("Reports:", [" 📊 Attendance Muster", "📈 Summary Report", "💰 OT Slab Report", "⚠️ Late/Early Log", "❌ Miss Punch", "🛠️ Correction"])
         
         if file:
-            with st.spinner("Processing attendance calculations..."):
+            with st.spinner("Processing calculations..."):
                 m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, tuple(st.session_state.corrs))
             
             if m is not None:
                 st.subheader(f"Report Output: {menu.strip()}")
-                if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
+                if menu == " 📊 Attendance Muster": st.dataframe(m, use_container_width=True)
                 elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
                 elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
                 elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
@@ -319,25 +305,24 @@ else:
             st.markdown("### 🛠️ Attendance Punch Correction")
             with st.form("corr_form"):
                 c1, c2, c3, c4 = st.columns(4)
-                eid = c1.text_input("Employee ID")
+                eid = c1.text_input("ID")
                 dt = c2.number_input("Date", 1, 31)
-                cin = c3.text_input("IN Time (HH:MM)")
-                cout = c4.text_input("OUT Time (HH:MM)")
+                cin = c3.text_input("IN")
+                cout = c4.text_input("OUT")
                 
                 if st.form_submit_button("Add Correction"):
                     st.session_state.corrs.append({'id': eid, 'date': int(dt), 'in': cin, 'out': cout})
-                    st.success("Correction entry saved successfully!")
+                    st.success("Correction entry saved!")
                     st.rerun()
     
     else:
         st.subheader("Employee Profile Management")
         t1, t2, t3, t4, t5, t6 = st.tabs([
-            "➕ Add Manual", "📄 Import CSV", "🗑️ Delete Record", 
-            "🔍 Filter & Edit", "📥 Export", "ℹ️ Help"
+            "➕ Add Manual", "📄 Important Uploads", "🗑️ Delete Record", 
+            "🔍 Filter/Edit", "📥 Download", "ℹ️ Help"
         ])
         
         with t1:
-            st.markdown("##### Fill Employee Details")
             with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 data = {
@@ -367,20 +352,19 @@ else:
                     "BloodGroup": c1.text_input("BloodGroup")
                 }
                 photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
-                if st.form_submit_button("💾 Save Record", use_container_width=True):
+                if st.form_submit_button("Save Record", use_container_width=True):
                     if photo: data["Photo"] = photo.name
                     st.session_state.profiles.append(data)
-                    st.success("Employee Record Saved Successfully!")
+                    st.success("Record Saved Successfully!")
 
         with t2:
-            st.markdown("##### Batch Import Profiles")
-            up = st.file_uploader("Upload CSV File", type=['csv'])
+            up = st.file_uploader("Upload CSV", type=['csv'])
             if up: 
                 try:
                     df_up = pd.read_csv(up, encoding='latin1').dropna(how='all').fillna('')
-                    st.success(f"Total Rows Found: {len(df_up)}")
+                    st.write(f"Total Rows Found: {len(df_up)}")
                     st.dataframe(df_up, use_container_width=True) 
-                    if st.button("Confirm & Upload Records", type="primary"): 
+                    if st.button("Confirm & Upload"): 
                         st.session_state.profiles.extend(df_up.to_dict('records'))
                         st.success("Data Imported Successfully!")
                         st.rerun()
@@ -388,7 +372,7 @@ else:
                     st.error(f"Error reading file: {e}")
 
         with t3:
-            st.markdown("##### Batch Delete Employees")
+            st.subheader("Batch Delete Employees")
             if st.session_state.profiles:
                 options = {f"{p.get('ID')} - {p.get('Name')}": p.get('ID') for p in st.session_state.profiles}
                 del_ids = st.multiselect("Select Employees to Delete:", options=list(options.keys()))
@@ -398,10 +382,10 @@ else:
                     st.success("Selected records deleted!")
                     st.rerun()
             else:
-                st.info("No employee profiles available to delete.")
+                st.info("No employee profiles found.")
 
         with t4:
-            st.markdown("##### Search & Filter Employees")
+            st.subheader("Search & Filter Employees")
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
                 c1, c2, c3 = st.columns(3)
@@ -410,7 +394,7 @@ else:
                 
                 dept_filter = c1.multiselect("Filter by Dept:", dept_list)
                 desig_filter = c2.multiselect("Filter by Designation:", desig_list)
-                search_term = c3.text_input("🔍 Quick Find:", placeholder="Search by name or ID...")
+                search_term = c3.text_input("🔍 Quick Find:", placeholder="Type name or ID...")
 
                 filt = df.copy()
                 if dept_filter: filt = filt[filt['Dept'].isin(dept_filter)]
@@ -422,23 +406,21 @@ else:
                 filt.insert(0, 'Sr. No.', range(1, len(filt) + 1))
                 edited_df = st.data_editor(filt, use_container_width=True, num_rows="dynamic")
                 
-                if st.button("💾 Save All Changes", use_container_width=True, type="primary"):
+                if st.button("💾 Save All Changes", use_container_width=True):
                     if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
                     st.session_state.profiles = edited_df.to_dict('records')
-                    st.success("Changes saved successfully!")
+                    st.success("Changes saved!")
                     st.rerun()
             else:
                 st.info("No employee profiles found.")
 
         with t5:
-            st.markdown("##### Export Employee Directory")
             if st.session_state.profiles:
                 df = pd.DataFrame(st.session_state.profiles)
-                c1, c2 = st.columns(2)
-                c1.download_button("📥 Export CSV Data", df.to_csv(index=False), "Employee_Report.csv", use_container_width=True)
-                c2.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html" style="text-decoration:none;"><button style="width:100%; height:40px; border-radius:10px; background:#1E293B; color:white; border:none; font-weight:600; cursor:pointer;">📥 Download Printable HTML/PDF</button></a>', unsafe_allow_html=True)
+                st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
+                st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
             else:
-                st.info("No employee profiles available for export.")
+                st.info("No employee profiles found.")
 
         with t6:
-            st.warning("⚠️ Ensure CSV headers match the exact template schema before uploading.")
+            st.warning("Ensure CSV headers match the template.")
