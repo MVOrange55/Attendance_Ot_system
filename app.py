@@ -23,9 +23,8 @@ def load_lottieurl(url: str):
     except:
         return None
 
-# Load High Quality Animation JSONs (CDN links)
+# Load High Quality Animation JSONs
 lottie_login = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_kvwa8b2v.json")  # Modern Security Lock
-lottie_welcome = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_u4yrau.json")  # Success Celebration
 
 # --- HIGH-CONTRAST & HIGH-VISIBILITY CSS WITH ANIMATION STYLES ---
 st.markdown("""
@@ -146,6 +145,16 @@ st.markdown("""
         border: 1px solid #CBD5E1 !important;
         border-radius: 10px !important;
     }
+
+    /* Help Cards */
+    .help-card {
+        background-color: #FFFFFF;
+        border: 1.5px solid #E2E8F0;
+        border-left: 5px solid #EA580C;
+        padding: 16px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -262,7 +271,6 @@ if not st.session_state.auth:
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        # Left Side Animated Lottie
         if lottie_login:
             st_lottie(lottie_login, height=380, key="login_anim")
         else:
@@ -287,12 +295,11 @@ if not st.session_state.auth:
             if submit:
                 if u == "admin" and p == "H_r": 
                     st.session_state.auth = True
-                    st.session_state.just_logged_in = True  # Flag for Welcome animation
+                    st.session_state.just_logged_in = True
                     st.rerun()
                 else:
                     st.error("Invalid Username or Password")
 else:
-    # Trigger Confetti Celebration animation on successful login
     if st.session_state.get('just_logged_in', False):
         st.balloons()
         st.toast("🎉 Login Successful! Welcome to Admin Portal.", icon="🍊")
@@ -447,4 +454,4 @@ else:
                 
                 if st.button("💾 Save All Changes", use_container_width=True):
                     if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
-                    st.session_state.profiles = edited_df.to_dic
+                    st.session_state.profiles = edited_df.to_dict('records')
