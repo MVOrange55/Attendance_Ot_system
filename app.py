@@ -25,91 +25,123 @@ lottie_anime = load_lottieurl("https://assets8.lottiefiles.com/packages/lf20_1pf
 st.set_page_config(
     page_title="Orange House HR Portal", 
     layout="wide", 
-    page_icon="🔥",
+    page_icon="🌲",
     initial_sidebar_state="expanded"
 )
 
-# --- 2. HIGH CONTRAST DARK ANIME THEME CSS ---
-st.markdown("""
+# --- 2. MISTY FOREST BACKGROUND & GLASSMORPHISM CSS ---
+# Aap apni image URL ko niche 'bg_url' me Replace kar sakte hain
+bg_url = "https://images.unsplash.com/photo-1511497584788-876761c119ef?auto=format&fit=crop&w=1920&q=80"
+
+st.markdown(f"""
 <style>
-    /* Dark Theme Background */
-    .stApp {
-        background: #0B0E14 !important;
+    /* App Background with Dark Overlay for Image */
+    .stApp {{
+        background: linear-gradient(rgba(11, 14, 20, 0.75), rgba(11, 14, 20, 0.88)), 
+                    url('{bg_url}') no-repeat center center fixed !important;
+        background-size: cover !important;
         color: #F3F4F6 !important;
         font-family: 'Inter', -apple-system, sans-serif;
-    }
+    }}
 
-    /* Keyframe Pulse Animation for Login */
-    @keyframes glowPulse {
-        0% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
-        50% { box-shadow: 0 0 30px rgba(220, 38, 38, 0.8), 0 0 10px rgba(34, 197, 94, 0.5); }
-        100% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
-    }
+    /* Keyframe Pulse Animation for Login Glow */
+    @keyframes cozyGlow {{
+        0% {{ box-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }}
+        50% {{ box-shadow: 0 0 30px rgba(245, 158, 11, 0.7), 0 0 15px rgba(34, 197, 94, 0.4); }}
+        100% {{ box-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }}
+    }}
 
-    /* Login Card Box */
-    .login-box {
-        background: #111827;
+    /* Glassmorphism Login Card Box */
+    .login-box {{
+        background: rgba(17, 24, 39, 0.85) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
         padding: 35px;
-        border-radius: 16px;
-        border: 1px solid #DC2626;
-        animation: glowPulse 3s infinite ease-in-out;
-    }
+        border-radius: 18px;
+        border: 1px solid rgba(245, 158, 11, 0.5);
+        animation: cozyGlow 4s infinite ease-in-out;
+    }}
 
     /* Top Banner Header */
-    .hero-header {
-        background: linear-gradient(135deg, #991B1B 0%, #DC2626 50%, #15803D 100%);
+    .hero-header {{
+        background: linear-gradient(135deg, rgba(180, 83, 9, 0.9) 0%, rgba(20, 83, 45, 0.9) 100%);
+        backdrop-filter: blur(8px);
         padding: 22px 28px;
         border-radius: 14px;
         color: #FFFFFF !important;
         margin-bottom: 20px;
-        box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
-    }
-    .hero-header h1 { color: #FFFFFF !important; margin: 0; font-size: 2.2rem; font-weight: 800; }
-    .hero-header p { color: #FEF2F2 !important; margin: 4px 0 0 0; font-size: 0.95rem; }
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+    }}
+    .hero-header h1 {{ color: #FFFFFF !important; margin: 0; font-size: 2.2rem; font-weight: 800; }}
+    .hero-header p {{ color: #FEF2F2 !important; margin: 4px 0 0 0; font-size: 0.95rem; }}
 
-    /* --- FONT VISIBILITY FIXES (HIGH CONTRAST) --- */
-    
-    /* Global Labels & Text */
-    label, p, span, h1, h2, h3, h4, h5, h6, div {
-        color: #F9FAFB !important;
-    }
-
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #030712 !important;
+    /* --- SIDEBAR & WIDGET VISIBILITY OVERRIDES --- */
+    section[data-testid="stSidebar"] {{
+        background-color: rgba(3, 7, 18, 0.92) !important;
+        backdrop-filter: blur(10px);
         border-right: 1px solid #1F2937;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #F9FAFB !important;
-    }
-
-    /* Inputs, Dropdowns & Selectboxes Text Fix */
-    div[data-baseweb="select"] *, 
-    .stSelectbox div, 
-    .stMultiSelect div, 
-    input, 
-    textarea {
-        color: #FFFFFF !important;
-        background-color: #1F2937 !important;
-        border-color: #374151 !important;
-        font-weight: 600 !important;
-    }
+    }}
     
-    /* Form Input Fields Focus */
-    input:focus, textarea:focus {
+    /* Universal Text Color Override */
+    label, p, span, h1, h2, h3, h4, h5, h6, div {{
+        color: #F9FAFB !important;
+    }}
+
+    /* File Uploader FIX */
+    [data-testid="stFileUploadDropzone"] {{
+        background-color: rgba(30, 41, 59, 0.85) !important;
+        border: 2px dashed #F59E0B !important;
+        border-radius: 10px !important;
+    }}
+    [data-testid="stFileUploadDropzone"] * {{
+        color: #F8FAFC !important;
+        background-color: transparent !important;
+    }}
+
+    /* Selectbox & Multiselect FIX */
+    div[data-baseweb="select"] > div {{
+        background-color: #1E293B !important;
+        border-color: #374151 !important;
+        color: #FFFFFF !important;
+    }}
+    div[data-baseweb="select"] * {{
+        color: #FFFFFF !important;
+        background-color: transparent !important;
+    }}
+    div[data-baseweb="popover"] {{
+        background-color: #111827 !important;
+    }}
+    li[role="option"] {{
+        background-color: #1E293B !important;
+        color: #FFFFFF !important;
+    }}
+    li[role="option"]:hover {{
+        background-color: #F59E0B !important;
+    }}
+
+    /* Multiselect Tags Styling */
+    span[data-baseweb="tag"] {{
+        background-color: #D97706 !important;
+        border-radius: 4px !important;
+    }}
+    span[data-baseweb="tag"] * {{
+        color: #FFFFFF !important;
+    }}
+
+    /* Inputs Focus */
+    input, textarea {{
+        color: #FFFFFF !important;
+        background-color: #1E293B !important;
+        border-color: #374151 !important;
+    }}
+    input:focus, textarea:focus {{
         border-color: #22C55E !important;
         box-shadow: 0 0 8px rgba(34, 197, 94, 0.5) !important;
-    }
+    }}
 
-    /* File Uploader Fix */
-    section[data-testid="stFileUploadDropzone"] {
-        background-color: #111827 !important;
-        border: 2px dashed #DC2626 !important;
-        border-radius: 10px !important;
-    }
-
-    /* Buttons Styling (Neon Accent) */
-    .stButton > button {
+    /* Buttons Styling */
+    .stButton > button {{
         background: #15803D !important;
         color: #FFFFFF !important;
         border-radius: 8px !important;
@@ -117,56 +149,57 @@ st.markdown("""
         border: none !important;
         padding: 10px 20px !important;
         transition: all 0.3s ease !important;
-    }
-    .stButton > button:hover {
+    }}
+    .stButton > button:hover {{
         background: #22C55E !important;
         box-shadow: 0 0 15px rgba(34, 197, 94, 0.6) !important;
         transform: translateY(-2px);
-    }
+    }}
     
-    /* Primary / Form Submit Buttons */
-    div[data-testid="stFormSubmitButton"] > button {
-        background: linear-gradient(135deg, #16A34A 0%, #22C55E 100%) !important;
+    /* Form Submit Button */
+    div[data-testid="stFormSubmitButton"] > button {{
+        background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%) !important;
         color: #FFFFFF !important;
         font-weight: 800 !important;
-        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4) !important;
-    }
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4) !important;
+    }}
 
-    /* Metric Cards Fix */
-    .metric-card {
-        background: #111827;
+    /* Metric Cards */
+    .metric-card {{
+        background: rgba(17, 24, 39, 0.85);
+        backdrop-filter: blur(8px);
         padding: 18px;
         border-radius: 12px;
         border: 1px solid #374151;
         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         text-align: center;
-    }
-    .metric-card .num { font-size: 1.8rem; font-weight: 800; color: #22C55E; }
-    .metric-card .label { font-size: 0.85rem; color: #9CA3AF !important; font-weight: 700; text-transform: uppercase; }
+    }}
+    .metric-card .num {{ font-size: 1.8rem; font-weight: 800; color: #F59E0B; }}
+    .metric-card .label {{ font-size: 0.85rem; color: #9CA3AF !important; font-weight: 700; text-transform: uppercase; }}
 
-    /* Data Tables High Visibility */
-    div[data-testid="stDataFrame"] {
-        background-color: #111827 !important;
+    /* Data Frame Tables */
+    div[data-testid="stDataFrame"] {{
+        background-color: rgba(17, 24, 39, 0.9) !important;
         border-radius: 10px;
         border: 1px solid #374151;
-    }
+    }}
 
     /* Tabs Styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #111827 !important;
+    .stTabs [data-baseweb="tab-list"] {{
+        background-color: rgba(17, 24, 39, 0.85) !important;
         padding: 6px;
         border-radius: 8px;
         border: 1px solid #1F2937;
-    }
-    .stTabs [data-baseweb="tab"] {
+    }}
+    .stTabs [data-baseweb="tab"] {{
         color: #9CA3AF !important;
         font-weight: 700 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #DC2626 !important;
+    }}
+    .stTabs [aria-selected="true"] {{
+        background-color: #D97706 !important;
         color: #FFFFFF !important;
         border-radius: 6px !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -303,7 +336,7 @@ def run_hr_engine(df, holidays, corrections):
         })
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 5. ANIMATED LOGIN & MAIN UI FLOW ---
+# --- 5. UI FLOW ---
 if not st.session_state.auth:
     col1, col2 = st.columns([1.2, 1])
     
@@ -314,8 +347,8 @@ if not st.session_state.auth:
             st.markdown("""
                 <br><br>
                 <div style='text-align: center;'>
-                    <h1 style='font-size: 100px; margin: 0; text-shadow: 0 0 20px #DC2626;'>👹</h1>
-                    <h1 style='color: #DC2626; font-weight: 900; letter-spacing: 2px;'>ANIME HR REALM</h1>
+                    <h1 style='font-size: 100px; margin: 0; text-shadow: 0 0 25px #F59E0B;'>🛖</h1>
+                    <h1 style='color: #F59E0B; font-weight: 900; letter-spacing: 2px;'>MISTY HR REALM</h1>
                     <p style='color: #22C55E; font-weight: 600;'>Orange House Portal Access</p>
                 </div>
             """, unsafe_allow_html=True)
@@ -345,7 +378,7 @@ else:
     # Sidebar Navigation
     st.sidebar.markdown("""
         <div style='text-align: center; padding: 10px 0 20px 0;'>
-            <h2 style='color: #DC2626 !important; margin: 0; font-weight: 900;'>🔥 Orange House</h2>
+            <h2 style='color: #F59E0B !important; margin: 0; font-weight: 900;'>🔥 Orange House</h2>
             <span style='font-size: 0.85rem; color: #22C55E !important; font-weight: 700;'>HR Management Suite</span>
         </div>
         <hr style='border-color: #374151;'>
@@ -358,7 +391,7 @@ else:
         st.session_state.auth = False
         st.rerun()
 
-    # Main Hero Banner Header
+    # Main Hero Banner
     st.markdown("""
         <div class="hero-header">
             <h1>Orange House HR Portal</h1>
@@ -457,31 +490,5 @@ else:
                     "Address": c2.text_area("Address", height=100), 
                     "EmergencyName": c1.text_input("EmergencyName"), 
                     "EmergencyContact": c1.text_input("EmergencyContact"), 
-                    "ESIC": c2.text_input("ESIC"), 
-                    "Qualification": c1.text_input("Qualification"), 
-                    "Experience": c2.text_input("Experience"), 
-                    "PAN": c2.text_input("PAN"), 
-                    "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), 
-                    "Nationality": c2.text_input("Nationality"), 
-                    "BloodGroup": c1.text_input("BloodGroup")
-                }
-                photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
-                if st.form_submit_button("Save Record", use_container_width=True):
-                    if photo:
-                        data["Photo"] = photo.name
-                    st.session_state.profiles.append(data)
-                    st.success("Record Saved Successfully!")
-
-        with t2:
-            up = st.file_uploader("Upload CSV", type=['csv'])
-            if up: 
-                try:
-                    df_up = pd.read_csv(up, encoding='latin1').dropna(how='all').fillna('')
-                    st.write(f"Total Rows Found: {len(df_up)}")
-                    st.dataframe(df_up, use_container_width=True) 
-                    if st.button("Confirm & Import Records"): 
-                        st.session_state.profiles.extend(df_up.to_dict('records'))
-                        st.success("Data Imported Successfully!")
-                        st.rerun()
-                except Exception as e:
-                    st.error()
+                    "ESIC": c2.text_input("ESIC"),
+                
