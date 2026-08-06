@@ -19,138 +19,153 @@ def load_lottieurl(url: str):
     except Exception:
         return None
 
-# Load Login Animation JSON
-lottie_login_json = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_kvwa8b2v.json") if HAS_LOTTIE else None
+lottie_anime = load_lottieurl("https://assets8.lottiefiles.com/packages/lf20_1pfig97b.json") if HAS_LOTTIE else None
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
     page_title="Orange House HR Portal", 
     layout="wide", 
-    page_icon="🍊",
+    page_icon="🔥",
     initial_sidebar_state="expanded"
 )
 
-# --- 2. HIGH-CONTRAST VISIBILITY & ANIMATION CSS ---
+# --- 2. HIGH CONTRAST DARK ANIME THEME CSS ---
 st.markdown("""
 <style>
-    /* Main App Background */
+    /* Dark Theme Background */
     .stApp {
-        background-color: #F8FAFC !important;
+        background: #0B0E14 !important;
+        color: #F3F4F6 !important;
         font-family: 'Inter', -apple-system, sans-serif;
     }
 
-    /* Hero Banner Header */
+    /* Keyframe Pulse Animation for Login */
+    @keyframes glowPulse {
+        0% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
+        50% { box-shadow: 0 0 30px rgba(220, 38, 38, 0.8), 0 0 10px rgba(34, 197, 94, 0.5); }
+        100% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
+    }
+
+    /* Login Card Box */
+    .login-box {
+        background: #111827;
+        padding: 35px;
+        border-radius: 16px;
+        border: 1px solid #DC2626;
+        animation: glowPulse 3s infinite ease-in-out;
+    }
+
+    /* Top Banner Header */
     .hero-header {
-        background: linear-gradient(135deg, #FF6B00 0%, #E05200 100%);
+        background: linear-gradient(135deg, #991B1B 0%, #DC2626 50%, #15803D 100%);
         padding: 22px 28px;
         border-radius: 14px;
         color: #FFFFFF !important;
         margin-bottom: 20px;
-        box-shadow: 0 8px 20px rgba(255, 107, 0, 0.25);
+        box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
     }
-    .hero-header h1 { color: #FFFFFF !important; margin: 0; font-size: 2rem; font-weight: 800; }
-    .hero-header p { color: #FFEDD5 !important; margin: 4px 0 0 0; font-size: 0.95rem; }
+    .hero-header h1 { color: #FFFFFF !important; margin: 0; font-size: 2.2rem; font-weight: 800; }
+    .hero-header p { color: #FEF2F2 !important; margin: 4px 0 0 0; font-size: 0.95rem; }
 
-    /* --- SIDEBAR VISIBILITY FIXES --- */
+    /* --- FONT VISIBILITY FIXES (HIGH CONTRAST) --- */
+    
+    /* Global Labels & Text */
+    label, p, span, h1, h2, h3, h4, h5, h6, div {
+        color: #F9FAFB !important;
+    }
+
+    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
-        background-color: #0F172A !important;
+        background-color: #030712 !important;
+        border-right: 1px solid #1F2937;
     }
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] .stMarkdown,
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3,
-    section[data-testid="stSidebar"] p {
-        color: #F8FAFC !important;
-        font-weight: 600 !important;
+    section[data-testid="stSidebar"] * {
+        color: #F9FAFB !important;
     }
 
-    /* Fix Sidebar Dropdowns, Inputs & Selectboxes Text */
-    section[data-testid="stSidebar"] div[data-baseweb="select"] *,
-    section[data-testid="stSidebar"] .stSelectbox div,
-    section[data-testid="stSidebar"] .stMultiSelect div,
-    section[data-testid="stSidebar"] input {
-        color: #0F172A !important;
-        background-color: #FFFFFF !important;
-        font-weight: 600 !important;
-    }
-
-    /* File Uploader Visibility Fix in Sidebar */
-    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] {
-        background-color: #1E293B !important;
-        border: 2px dashed #FF6B00 !important;
-        border-radius: 10px !important;
-    }
-    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] * {
-        color: #F8FAFC !important;
-    }
-    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] button {
-        background-color: #FF6B00 !important;
+    /* Inputs, Dropdowns & Selectboxes Text Fix */
+    div[data-baseweb="select"] *, 
+    .stSelectbox div, 
+    .stMultiSelect div, 
+    input, 
+    textarea {
         color: #FFFFFF !important;
-        border-radius: 6px !important;
-    }
-
-    /* Keyframe Animations */
-    @keyframes floatAnim {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-        100% { transform: translateY(0px); }
-    }
-    .floating-logo {
-        animation: floatAnim 3s ease-in-out infinite;
-        text-align: center;
-        font-size: 80px;
-        margin-bottom: 10px;
-    }
-
-    /* Buttons Styling */
-    .stButton > button {
-        background-color: #0F172A !important;
-        color: #FFFFFF !important;
-        border-radius: 8px !important;
+        background-color: #1F2937 !important;
+        border-color: #374151 !important;
         font-weight: 600 !important;
-        border: none !important;
-        padding: 8px 16px !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton > button:hover {
-        background-color: #1E293B !important;
-        transform: translateY(-1px);
     }
     
-    div[data-testid="stFormSubmitButton"] > button, .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #FF6B00 0%, #E05200 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3) !important;
+    /* Form Input Fields Focus */
+    input:focus, textarea:focus {
+        border-color: #22C55E !important;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.5) !important;
     }
 
-    /* Metric Cards */
+    /* File Uploader Fix */
+    section[data-testid="stFileUploadDropzone"] {
+        background-color: #111827 !important;
+        border: 2px dashed #DC2626 !important;
+        border-radius: 10px !important;
+    }
+
+    /* Buttons Styling (Neon Accent) */
+    .stButton > button {
+        background: #15803D !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton > button:hover {
+        background: #22C55E !important;
+        box-shadow: 0 0 15px rgba(34, 197, 94, 0.6) !important;
+        transform: translateY(-2px);
+    }
+    
+    /* Primary / Form Submit Buttons */
+    div[data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #16A34A 0%, #22C55E 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4) !important;
+    }
+
+    /* Metric Cards Fix */
     .metric-card {
-        background: #FFFFFF;
-        padding: 16px;
-        border-radius: 10px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        background: #111827;
+        padding: 18px;
+        border-radius: 12px;
+        border: 1px solid #374151;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         text-align: center;
     }
-    .metric-card .num { font-size: 1.6rem; font-weight: 800; color: #FF6B00; }
-    .metric-card .label { font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase; }
+    .metric-card .num { font-size: 1.8rem; font-weight: 800; color: #22C55E; }
+    .metric-card .label { font-size: 0.85rem; color: #9CA3AF !important; font-weight: 700; text-transform: uppercase; }
+
+    /* Data Tables High Visibility */
+    div[data-testid="stDataFrame"] {
+        background-color: #111827 !important;
+        border-radius: 10px;
+        border: 1px solid #374151;
+    }
 
     /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #E2E8F0 !important;
-        padding: 4px;
+        background-color: #111827 !important;
+        padding: 6px;
         border-radius: 8px;
+        border: 1px solid #1F2937;
     }
     .stTabs [data-baseweb="tab"] {
-        color: #475569 !important;
+        color: #9CA3AF !important;
         font-weight: 700 !important;
-        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #FFFFFF !important;
-        color: #FF6B00 !important;
+        background-color: #DC2626 !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -288,26 +303,29 @@ def run_hr_engine(df, holidays, corrections):
         })
     return pd.DataFrame(res_m), pd.DataFrame(res_s), pd.DataFrame(res_o), pd.DataFrame(res_ex), pd.DataFrame(res_mi)
 
-# --- 5. UI FLOW ---
+# --- 5. ANIMATED LOGIN & MAIN UI FLOW ---
 if not st.session_state.auth:
-    c1, c2 = st.columns([1.1, 1])
+    col1, col2 = st.columns([1.2, 1])
     
-    with c1:
-        if HAS_LOTTIE and lottie_login_json:
-            st_lottie(lottie_login_json, height=360, key="login_animation")
+    with col1:
+        if HAS_LOTTIE and lottie_anime:
+            st_lottie(lottie_anime, height=420, key="anime_login_art")
         else:
             st.markdown("""
                 <br><br>
-                <div class="floating-logo">🍊</div>
-                <h2 style='text-align: center; color: #FF6B00; font-weight: 800;'>Orange House HR</h2>
+                <div style='text-align: center;'>
+                    <h1 style='font-size: 100px; margin: 0; text-shadow: 0 0 20px #DC2626;'>👹</h1>
+                    <h1 style='color: #DC2626; font-weight: 900; letter-spacing: 2px;'>ANIME HR REALM</h1>
+                    <p style='color: #22C55E; font-weight: 600;'>Orange House Portal Access</p>
+                </div>
             """, unsafe_allow_html=True)
             
-    with c2:
-        st.markdown("<br>", unsafe_allow_html=True)
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style='background: white; padding: 30px; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);'>
-                <h2 style='color: #FF6B00; margin: 0; font-weight: 800;'>Admin Sign In</h2>
-                <p style='color: #64748B; font-size: 0.9rem; margin-bottom: 20px;'>Enter credentials to access HR Engine</p>
+            <div class="login-box">
+                <h2 style='color: #F9FAFB; margin: 0; font-weight: 800;'>Login to your account</h2>
+                <p style='color: #9CA3AF; font-size: 0.9rem; margin-bottom: 25px;'>Welcome back! Enter credentials to continue.</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -315,36 +333,36 @@ if not st.session_state.auth:
             u = st.text_input("User ID", placeholder="admin")
             p = st.text_input("Password", type="password", placeholder="••••••••")
             st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("🔒 Secure Login", use_container_width=True)
+            submit = st.form_submit_button("LOG IN TO SYSTEM", use_container_width=True)
             
             if submit:
                 if u == "admin" and p == "H_r":
                     st.session_state.auth = True
                     st.rerun()
                 else:
-                    st.error("Invalid Username or Password")
+                    st.error("Invalid Credentials. Please try again.")
 else:
-    # Sidebar
+    # Sidebar Navigation
     st.sidebar.markdown("""
         <div style='text-align: center; padding: 10px 0 20px 0;'>
-            <h2 style='color: #FF6B00 !important; margin: 0;'>🍊 Orange House</h2>
-            <span style='font-size: 0.8rem; color: #94A3B8 !important;'>HR Management Studio</span>
+            <h2 style='color: #DC2626 !important; margin: 0; font-weight: 900;'>🔥 Orange House</h2>
+            <span style='font-size: 0.85rem; color: #22C55E !important; font-weight: 700;'>HR Management Suite</span>
         </div>
-        <hr style='border-color: #334155;'>
+        <hr style='border-color: #374151;'>
     """, unsafe_allow_html=True)
     
-    nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
+    nav = st.sidebar.radio("Navigation Menu:", ["📊 Attendance Engine", "👤 Employee Directory"])
     
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     if st.sidebar.button("🔒 Logout Account", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
-    # Top Banner
+    # Main Hero Banner Header
     st.markdown("""
         <div class="hero-header">
             <h1>Orange House HR Portal</h1>
-            <p>Smart Attendance Analytics & Employee Directory Workspace</p>
+            <p>High-Performance Workforce Engine & Analytics Directory</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -362,7 +380,7 @@ else:
         ])
         
         if file:
-            with st.spinner("Processing calculations..."):
+            with st.spinner("Crunching analytics..."):
                 m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
             
             if m is not None:
@@ -411,11 +429,11 @@ else:
         
         t1, t2, t3, t4, t5, t6 = st.tabs([
             "➕ Add Manual", 
-            "📄 Important Uploads", 
+            "📄 CSV Upload", 
             "🗑️ Delete Record", 
-            "🔍 Filter/Edit", 
-            "📥 Download", 
-            "ℹ️ Help"
+            "🔍 Search & Edit", 
+            "📥 Export Data", 
+            "ℹ️ System Info"
         ])
         
         with t1:
@@ -426,7 +444,7 @@ else:
                     "Name": c1.text_input("Name"), 
                     "Gender": c1.selectbox("Gender", ["Male", "Female"]), 
                     "DOB": str(c1.date_input("DOB")), 
-                    "DOJ": str(c1.date_input("DOJ")), 
+                    "DOJ": str(c2.date_input("DOJ")), 
                     "Dept": c2.text_input("Dept"), 
                     "Contact": c1.text_input("Contact (Max 10)", max_chars=10), 
                     "PF": c2.text_input("PF (Max 12)", max_chars=12), 
@@ -461,15 +479,9 @@ else:
                     df_up = pd.read_csv(up, encoding='latin1').dropna(how='all').fillna('')
                     st.write(f"Total Rows Found: {len(df_up)}")
                     st.dataframe(df_up, use_container_width=True) 
-                    if st.button("Confirm & Upload"): 
+                    if st.button("Confirm & Import Records"): 
                         st.session_state.profiles.extend(df_up.to_dict('records'))
                         st.success("Data Imported Successfully!")
                         st.rerun()
                 except Exception as e:
-                    st.error(f"Error reading file: {e}")
-
-        with t3:
-            st.subheader("Batch Delete Employees")
-            if st.session_state.profiles:
-                options = {f"{p.get('ID')} - {p.get('Name')}": p.get('ID') for p in st.session_state.profiles}
-                del_ids = st.multiselect("Select Employees to Delete:", options=list(options.keys()))
+                    st.error(
