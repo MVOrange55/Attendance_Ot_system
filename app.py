@@ -497,7 +497,7 @@ else:
                     "PF": c2.text_input("PF (Max 12)", max_chars=12), 
                     "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), 
                     "Status": c2.selectbox("Status", ["Active", "Inactive"]), 
-                    "Designation": c2.text_input("Designat)
+                    "Designation": c2.text_input("Designation")
 
 
                                                  }
