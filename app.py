@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
+import json
+import requests
+from streamlit_lottie import st_lottie
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
@@ -10,7 +13,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- HIGH-CONTRAST & HIGH-VISIBILITY CSS ---
+# --- HELPER FUNCTION FOR LOTTIE ANIMATIONS ---
+def load_lottieurl(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
+
+# Load High Quality Animation JSONs (CDN links)
+lottie_login = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_kvwa8b2v.json")  # Modern Security Lock
+lottie_welcome = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_u4yrau.json")  # Success Celebration
+
+# --- HIGH-CONTRAST & HIGH-VISIBILITY CSS WITH ANIMATION STYLES ---
 st.markdown("""
 <style>
     /* Main Background & Base Text */
@@ -25,13 +42,14 @@ st.markdown("""
         color: #0F172A !important;
     }
 
-    /* Main Orange Banner Header */
+    /* Main Orange Banner Header with Pulse Animation */
     .brand-header {
         background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%);
         padding: 22px 28px;
         border-radius: 14px;
         margin-bottom: 25px;
         box-shadow: 0 4px 15px rgba(234, 88, 12, 0.25);
+        animation: fadeIn 0.8s ease-in-out;
     }
     .brand-header h1 {
         color: #FFFFFF !important;
@@ -45,7 +63,13 @@ st.markdown("""
         font-size: 0.95rem;
     }
 
-    /* Input Fields, Text Areas & Select Boxes - Clear Dark Text & Solid Borders */
+    /* Keyframe Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Input Fields & Text Areas */
     .stTextInput input, .stSelectbox > div, .stNumberInput input, .stTextArea textarea {
         background-color: #FFFFFF !important;
         color: #0F172A !important;
@@ -59,7 +83,7 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25) !important;
     }
 
-    /* Buttons Styling (High Contrast) */
+    /* Buttons Styling */
     .stButton > button {
         background-color: #1E293B !important;
         color: #FFFFFF !important;
@@ -67,11 +91,12 @@ st.markdown("""
         font-weight: 600 !important;
         border: none !important;
         padding: 8px 16px !important;
-        transition: all 0.2s ease !important;
+        transition: all 0.3s ease !important;
     }
     .stButton > button:hover {
         background-color: #0F172A !important;
         color: #FFFFFF !important;
+        transform: translateY(-2px);
     }
     
     /* Primary / Submit Buttons */
@@ -98,7 +123,7 @@ st.markdown("""
         color: #F8FAFC !important;
     }
 
-    /* Tabs - High Contrast Active/Inactive State */
+    /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
         background-color: #E2E8F0 !important;
         border-radius: 10px;
@@ -234,14 +259,21 @@ def run_hr_engine(df, holidays, corrections):
 
 # --- 5. UI FLOW ---
 if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # Left Side Animated Lottie
+        if lottie_login:
+            st_lottie(lottie_login, height=380, key="login_anim")
+        else:
+            st.markdown("<br><br><h1 style='text-align: center; font-size: 80px;'>🍊</h1>", unsafe_allow_html=True)
+            
     with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <span style='font-size: 60px;'>🍊</span>
-                <h2 style='margin-top: 10px; font-weight: 800;'>Orange House</h2>
-                <p style='color: #475569 !important;'>HR Portal Login</p>
+            <div>
+                <h1 style='font-weight: 800; color: #EA580C !important; margin-bottom: 0;'>Orange House</h1>
+                <p style='color: #475569 !important; font-size: 1.1rem;'>HR Operations & Attendance Portal</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -250,15 +282,22 @@ if not st.session_state.auth:
             u = st.text_input("User ID", placeholder="Enter username")
             p = st.text_input("Password", type="password", placeholder="••••••••")
             st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("Login to Portal", use_container_width=True)
+            submit = st.form_submit_button("🔒 Secure Login", use_container_width=True)
             
             if submit:
                 if u == "admin" and p == "H_r": 
                     st.session_state.auth = True
+                    st.session_state.just_logged_in = True  # Flag for Welcome animation
                     st.rerun()
                 else:
                     st.error("Invalid Username or Password")
 else:
+    # Trigger Confetti Celebration animation on successful login
+    if st.session_state.get('just_logged_in', False):
+        st.balloons()
+        st.toast("🎉 Login Successful! Welcome to Admin Portal.", icon="🍊")
+        st.session_state.just_logged_in = False
+
     # Sidebar
     st.sidebar.markdown("""
         <div style='padding: 10px 0px 20px 0px; text-align: center;'>
@@ -408,19 +447,4 @@ else:
                 
                 if st.button("💾 Save All Changes", use_container_width=True):
                     if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
-                    st.session_state.profiles = edited_df.to_dict('records')
-                    st.success("Changes saved!")
-                    st.rerun()
-            else:
-                st.info("No employee profiles found.")
-
-        with t5:
-            if st.session_state.profiles:
-                df = pd.DataFrame(st.session_state.profiles)
-                st.download_button("📥 CSV Export", df.to_csv(index=False), "Report.csv")
-                st.markdown(f'<a href="data:text/html;charset=utf-8,{get_pdf_download_link(df)}" download="Report.html">📥 Download HTML/PDF View</a>', unsafe_allow_html=True)
-            else:
-                st.info("No employee profiles found.")
-
-        with t6:
-            st.warning("Ensure CSV headers match the template.")
+                    st.session_state.profiles = edited_df.to_dic
