@@ -1,6 +1,25 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, time, timedelta
+import json
+import requests
+
+# --- LOTTIE ANIMATION HELPER ---
+try:
+    from streamlit_lottie import st_lottie
+    HAS_LOTTIE = True
+except ImportError:
+    HAS_LOTTIE = False
+
+def load_lottieurl(url: str):
+    try:
+        r = requests.get(url, timeout=3)
+        if r.status_code != 200: return None
+        return r.json()
+    except: return None
+
+# Load Login Animation JSON
+lottie_login_json = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_kvwa8b2v.json") if HAS_LOTTIE else None
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
@@ -10,102 +29,127 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. GLOBAL CSS / THEME OVERHAUL ---
+# --- 2. HIGH-CONTRAST VISIBILITY & ANIMATION CSS ---
 st.markdown("""
 <style>
-    /* Global Page Styling */
+    /* Main App Background */
     .stApp {
-        background: #F1F5F9;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background-color: #F8FAFC !important;
+        font-family: 'Inter', -apple-system, sans-serif;
     }
-    
-    /* Top Header Banner */
+
+    /* Hero Banner Header */
     .hero-header {
         background: linear-gradient(135deg, #FF6B00 0%, #E05200 100%);
-        padding: 24px 32px;
-        border-radius: 16px;
-        color: white !important;
-        margin-bottom: 24px;
-        box-shadow: 0 10px 25px -5px rgba(255, 107, 0, 0.3);
+        padding: 22px 28px;
+        border-radius: 14px;
+        color: #FFFFFF !important;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 20px rgba(255, 107, 0, 0.25);
     }
-    .hero-header h1 { color: #FFFFFF !important; margin: 0; font-size: 2.2rem; font-weight: 800; }
-    .hero-header p { color: #FFEDD5 !important; margin-top: 4px; font-size: 1rem; opacity: 0.9; }
+    .hero-header h1 { color: #FFFFFF !important; margin: 0; font-size: 2rem; font-weight: 800; }
+    .hero-header p { color: #FFEDD5 !important; margin: 4px 0 0 0; font-size: 0.95rem; }
 
-    /* Custom Cards */
-    .metric-card {
-        background: #FFFFFF;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    /* --- SIDEBAR VISIBILITY FIXES --- */
+    section[data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+    }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p {
+        color: #F8FAFC !important;
+        font-weight: 600 !important;
+    }
+
+    /* Fix Sidebar Dropdowns, Inputs & Selectboxes Text */
+    section[data-testid="stSidebar"] div[data-baseweb="select"] *,
+    section[data-testid="stSidebar"] .stSelectbox div,
+    section[data-testid="stSidebar"] .stMultiSelect div,
+    section[data-testid="stSidebar"] input {
+        color: #0F172A !important;
+        background-color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    /* File Uploader Visibility Fix in Sidebar */
+    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] {
+        background-color: #1E293B !important;
+        border: 2px dashed #FF6B00 !important;
+        border-radius: 10px !important;
+    }
+    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] * {
+        color: #F8FAFC !important;
+    }
+    section[data-testid="stSidebar"] section[data-testid="stFileUploadDropzone"] button {
+        background-color: #FF6B00 !important;
+        color: #FFFFFF !important;
+        border-radius: 6px !important;
+    }
+
+    /* Keyframe Animations */
+    @keyframes floatAnim {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+    }
+    .floating-logo {
+        animation: floatAnim 3s ease-in-out infinite;
         text-align: center;
+        font-size: 80px;
+        margin-bottom: 10px;
     }
-    .metric-card .num { font-size: 1.8rem; font-weight: 800; color: #FF6B00; }
-    .metric-card .label { font-size: 0.85rem; color: #64748B; font-weight: 600; text-transform: uppercase; }
 
-    /* Buttons Overhaul */
+    /* Buttons Styling */
     .stButton > button {
         background-color: #0F172A !important;
         color: #FFFFFF !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
         border: none !important;
-        padding: 10px 20px !important;
+        padding: 8px 16px !important;
         transition: all 0.2s ease !important;
     }
     .stButton > button:hover {
         background-color: #1E293B !important;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
     }
     
-    /* Primary Action Buttons */
     div[data-testid="stFormSubmitButton"] > button, .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B00 0%, #E05200 100%) !important;
         color: #FFFFFF !important;
-        box-shadow: 0 4px 14px rgba(255, 107, 0, 0.35) !important;
-    }
-    div[data-testid="stFormSubmitButton"] > button:hover, .stButton > button[kind="primary"]:hover {
-        opacity: 0.95;
-        transform: translateY(-1px);
+        font-weight: 700 !important;
+        box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3) !important;
     }
 
-    /* Input Controls */
-    .stTextInput input, .stSelectbox > div, .stNumberInput input, .stTextArea textarea {
-        border-radius: 8px !important;
-        border: 1.5px solid #CBD5E1 !important;
-        background-color: #FFFFFF !important;
+    /* Metric Cards */
+    .metric-card {
+        background: #FFFFFF;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        text-align: center;
     }
-    .stTextInput input:focus, .stSelectbox > div:focus, .stTextArea textarea:focus {
-        border-color: #FF6B00 !important;
-        box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15) !important;
-    }
-
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #0F172A !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #F8FAFC !important;
-    }
+    .metric-card .num { font-size: 1.6rem; font-weight: 800; color: #FF6B00; }
+    .metric-card .label { font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase; }
 
     /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #E2E8F0;
-        padding: 6px;
-        border-radius: 10px;
+        background-color: #E2E8F0 !important;
+        padding: 4px;
+        border-radius: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 6px;
-        padding: 8px 16px;
-        font-weight: 600;
-        color: #475569;
+        color: #475569 !important;
+        font-weight: 700 !important;
+        border-radius: 6px !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #FFFFFF !important;
         color: #FF6B00 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -115,7 +159,7 @@ if 'auth' not in st.session_state: st.session_state.auth = False
 if 'corrs' not in st.session_state: st.session_state.corrs = []
 if 'profiles' not in st.session_state: st.session_state.profiles = []
 
-# --- 4. HELPER FUNCTIONS ---
+# --- 4. HELPER & ENGINE FUNCTIONS ---
 def get_pdf_download_link(df):
     return df.to_html(index=False)
 
@@ -217,45 +261,58 @@ def run_hr_engine(df, holidays, corrections):
 
 # --- 5. UI FLOW ---
 if not st.session_state.auth:
-    _, center_col, _ = st.columns([1, 1.2, 1])
-    with center_col:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    c1, c2 = st.columns([1.1, 1])
+    
+    with c1:
+        # Animated Lottie on Login Left Side
+        if HAS_LOTTIE and lottie_login_json:
+            st_lottie(lottie_login_json, height=360, key="login_animation")
+        else:
+            st.markdown("""
+                <br><br>
+                <div class="floating-logo">🍊</div>
+                <h2 style='text-align: center; color: #FF6B00; font-weight: 800;'>Orange House HR</h2>
+            """, unsafe_allow_html=True)
+            
+    with c2:
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style='text-align: center; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #E2E8F0;'>
-                <span style='font-size: 60px;'>🍊</span>
-                <h2 style='color: #FF6B00; font-weight: 800; margin-top: 10px; margin-bottom: 0;'>Orange House</h2>
-                <p style='color: #64748B; font-size: 0.95rem;'>Enterprise HR Portal Sign-In</p>
+            <div style='background: white; padding: 30px; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);'>
+                <h2 style='color: #FF6B00; margin: 0; font-weight: 800;'>Admin Sign In</h2>
+                <p style='color: #64748B; font-size: 0.9rem; margin-bottom: 20px;'>Enter credentials to access HR Engine</p>
             </div>
         """, unsafe_allow_html=True)
         
         with st.form("login_form"):
             u = st.text_input("User ID", placeholder="admin")
             p = st.text_input("Password", type="password", placeholder="••••••••")
-            submit = st.form_submit_button("Sign In to Portal", use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit = st.form_submit_button("🔒 Secure Login", use_container_width=True)
+            
             if submit:
                 if u == "admin" and p == "H_r":
                     st.session_state.auth = True
                     st.rerun()
                 else:
-                    st.error("Invalid credentials entered.")
+                    st.error("Invalid Username or Password")
 else:
-    # Sidebar Branding
+    # Sidebar
     st.sidebar.markdown("""
-        <div style='text-align: center; padding: 15px 0;'>
-            <h2 style='color: #FF6B00 !important; margin:0;'>🍊 Orange House</h2>
-            <p style='font-size: 0.8rem; color: #94A3B8 !important; margin:0;'>HR Management Studio</p>
+        <div style='text-align: center; padding: 10px 0 20px 0;'>
+            <h2 style='color: #FF6B00 !important; margin: 0;'>🍊 Orange House</h2>
+            <span style='font-size: 0.8rem; color: #94A3B8 !important;'>HR Management Studio</span>
         </div>
-        <hr style="border-color: #334155; margin: 15px 0;">
+        <hr style='border-color: #334155;'>
     """, unsafe_allow_html=True)
     
-    nav = st.sidebar.radio("Navigation", ["📊 Attendance Engine", "👤 Employee Directory"])
+    nav = st.sidebar.radio("Navigation:", ["📊 Attendance Engine", "👤 Employee Directory"])
     
-    st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
     if st.sidebar.button("🔒 Logout Account", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
-    # Top Banner Header
+    # Top Banner
     st.markdown("""
         <div class="hero-header">
             <h1>Orange House HR Portal</h1>
@@ -268,7 +325,7 @@ else:
         file = st.sidebar.file_uploader("Upload Attendance Excel", type=['xlsx'])
         hols = st.sidebar.multiselect("Select Holidays:", range(1, 32))
         menu = st.sidebar.selectbox("Select Report View:", [
-            "📊 Attendance Muster", 
+            " 📊 Attendance Muster", 
             "📈 Summary Report", 
             "💰 OT Slab Report", 
             "⚠️ Late/Early Log", 
@@ -277,12 +334,12 @@ else:
         ])
         
         if file:
-            with st.spinner("Calculating Shifts & Overtime..."):
+            with st.spinner("Processing calculations..."):
                 m, s, o, ex, mi = run_hr_engine(pd.read_excel(file), hols, st.session_state.corrs)
             
             if m is not None:
-                st.subheader(f"Output Matrix: {menu}")
-                if menu == "📊 Attendance Muster": st.dataframe(m, use_container_width=True)
+                st.subheader(f"Output Matrix: {menu.strip()}")
+                if menu == " 📊 Attendance Muster": st.dataframe(m, use_container_width=True)
                 elif menu == "📈 Summary Report": st.dataframe(s, use_container_width=True)
                 elif menu == "💰 OT Slab Report": st.dataframe(o, use_container_width=True)
                 elif menu == "⚠️ Late/Early Log": st.dataframe(ex, use_container_width=True)
@@ -304,7 +361,7 @@ else:
                     st.rerun()
     
     else:
-        # Directory Summary Metrics
+        # Directory Metrics
         m1, m2, m3, m4 = st.columns(4)
         df_prof = pd.DataFrame(st.session_state.profiles) if st.session_state.profiles else pd.DataFrame()
         
@@ -320,16 +377,15 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
         
         t1, t2, t3, t4, t5, t6 = st.tabs([
-            "➕ Add Profile", 
-            "📄 Batch Import", 
-            "🗑️ Batch Delete", 
-            "🔍 Find & Edit", 
-            "📥 Export Data", 
-            "ℹ️ System Guide"
+            "➕ Add Manual", 
+            "📄 Important Uploads", 
+            "🗑️ Delete Record", 
+            "🔍 Filter/Edit", 
+            "📥 Download", 
+            "ℹ️ Help"
         ])
         
         with t1:
-            st.markdown("##### Direct Profile Entry")
             with st.form("manual_emp", clear_on_submit=True):
                 c1, c2 = st.columns(2)
                 data = {
@@ -338,84 +394,59 @@ else:
                     "Gender": c1.selectbox("Gender", ["Male", "Female"]), 
                     "DOB": str(c1.date_input("DOB")), 
                     "DOJ": str(c1.date_input("DOJ")), 
-                    "Dept": c2.text_input("Department"), 
-                    "Contact": c1.text_input("Contact No.", max_chars=10), 
-                    "PF": c2.text_input("PF Number", max_chars=12), 
-                    "Aadhaar": c1.text_input("Aadhaar Number", max_chars=12), 
+                    "Dept": c2.text_input("Dept"), 
+                    "Contact": c1.text_input("Contact (Max 10)", max_chars=10), 
+                    "PF": c2.text_input("PF (Max 12)", max_chars=12), 
+                    "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), 
                     "Status": c2.selectbox("Status", ["Active", "Inactive"]), 
                     "Designation": c2.text_input("Designation"), 
-                    "Manager": c2.text_input("Reporting Manager"), 
-                    "FatherName": c1.text_input("Father's Name"), 
-                    "Email": c2.text_input("Work Email"), 
-                    "Address": c2.text_area("Permanent Address", height=100), 
-                    "EmergencyName": c1.text_input("Emergency Contact Person"), 
-                    "EmergencyContact": c1.text_input("Emergency Phone"), 
-                    "ESIC": c2.text_input("ESIC No."), 
-                    "Qualification": c1.text_input("Highest Qualification"), 
-                    "Experience": c2.text_input("Experience (Years)"), 
-                    "PAN": c2.text_input("PAN Card No."), 
-                    "MaritalStatus": c1.selectbox("Marital Status", ["Single", "Married"]), 
-                    "Nationality": c2.text_input("Nationality", value="Indian"), 
-                    "BloodGroup": c1.text_input("Blood Group")
+                    "Manager": c2.text_input("Manager"), 
+                    "FatherName": c1.text_input("FatherName"), 
+                    "Email": c2.text_input("Email"), 
+                    "Address": c2.text_area("Address", height=100), 
+                    "EmergencyName": c1.text_input("EmergencyName"), 
+                    "EmergencyContact": c1.text_input("EmergencyContact"), 
+                    "ESIC": c2.text_input("ESIC"), 
+                    "Qualification": c1.text_input("Qualification"), 
+                    "Experience": c2.text_input("Experience"), 
+                    "PAN": c2.text_input("PAN"), 
+                    "MaritalStatus": c1.selectbox("MaritalStatus", ["Single", "Married"]), 
+                    "Nationality": c2.text_input("Nationality"), 
+                    "BloodGroup": c1.text_input("BloodGroup")
                 }
-                photo = st.file_uploader("Upload Employee Picture", type=['jpg', 'png'])
-                if st.form_submit_button("Save New Employee", use_container_width=True):
+                photo = st.file_uploader("Upload Employee Photo", type=['jpg', 'png'])
+                if st.form_submit_button("Save Record", use_container_width=True):
                     if photo: data["Photo"] = photo.name
                     st.session_state.profiles.append(data)
-                    st.success("New Profile Registered Successfully!")
+                    st.success("Record Saved Successfully!")
 
         with t2:
-            st.markdown("##### Upload Bulk CSV Dataset")
-            up = st.file_uploader("Choose CSV Source File", type=['csv'])
+            up = st.file_uploader("Upload CSV", type=['csv'])
             if up: 
                 try:
                     df_up = pd.read_csv(up, encoding='latin1').dropna(how='all').fillna('')
-                    st.write(f"Detected Records: `{len(df_up)} Rows`")
+                    st.write(f"Total Rows Found: {len(df_up)}")
                     st.dataframe(df_up, use_container_width=True) 
-                    if st.button("Import Entire Dataset", type="primary"): 
+                    if st.button("Confirm & Upload"): 
                         st.session_state.profiles.extend(df_up.to_dict('records'))
-                        st.success("Directory Data Imported Successfully!")
+                        st.success("Data Imported Successfully!")
                         st.rerun()
                 except Exception as e:
-                    st.error(f"Failed to read dataset: {e}")
+                    st.error(f"Error reading file: {e}")
 
         with t3:
-            st.markdown("##### Bulk Delete Records")
+            st.subheader("Batch Delete Employees")
             if st.session_state.profiles:
                 options = {f"{p.get('ID')} - {p.get('Name')}": p.get('ID') for p in st.session_state.profiles}
-                del_ids = st.multiselect("Target Employees to Delete:", options=list(options.keys()))
-                if st.button("Confirm Purge Selected Records", type="primary"):
+                del_ids = st.multiselect("Select Employees to Delete:", options=list(options.keys()))
+                if st.button("Confirm Delete Selected", type="primary"):
                     selected_ids = [options[k] for k in del_ids]
                     st.session_state.profiles = [p for p in st.session_state.profiles if p.get('ID') not in selected_ids]
-                    st.success("Target profiles cleared!")
+                    st.success("Selected records deleted!")
                     st.rerun()
             else:
-                st.info("No saved records to delete.")
+                st.info("No employee profiles found.")
 
         with t4:
-            st.markdown("##### Search & Inline Table Editor")
-            if st.session_state.profiles:
-                df = pd.DataFrame(st.session_state.profiles)
-                c1, c2, c3 = st.columns(3)
-                dept_list = df['Dept'].unique().tolist() if 'Dept' in df.columns else []
-                desig_list = df['Designation'].unique().tolist() if 'Designation' in df.columns else []
-                
-                dept_filter = c1.multiselect("Filter Department:", dept_list)
-                desig_filter = c2.multiselect("Filter Designation:", desig_list)
-                search_term = c3.text_input("🔍 Quick Keyword Query:", placeholder="Type Name or Employee ID...")
-
-                filt = df.copy()
-                if dept_filter: filt = filt[filt['Dept'].isin(dept_filter)]
-                if desig_filter: filt = filt[filt['Designation'].isin(desig_filter)]
-                if search_term:
-                    filt = filt[filt['Name'].astype(str).str.contains(search_term, case=False) | 
-                                filt['ID'].astype(str).str.contains(search_term)]
-
-                filt.insert(0, 'Sr. No.', range(1, len(filt) + 1))
-                edited_df = st.data_editor(filt, use_container_width=True, num_rows="dynamic")
-                
-                if st.button("💾 Apply & Save Directory Edits", use_container_width=True):
-                    if 'Sr. No.' in edited_df.columns: edited_df = edited_df.drop(columns=['Sr. No.'])
-                    st.session_state.profiles = edited_df.to_dict('records')
-                    st.success("Employee records synchronized!")
-                    st.rerun()
+            st.subheader("Search & Filter Employees")
+            if st.session_state.profiles
