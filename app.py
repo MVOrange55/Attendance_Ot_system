@@ -491,4 +491,4 @@ else:
                     "EmergencyName": c1.text_input("EmergencyName"), 
                     "EmergencyContact": c1.text_input("EmergencyContact"), 
                     "ESIC": c2.text_input("ESIC"),
-                
+                }
