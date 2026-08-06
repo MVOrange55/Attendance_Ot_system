@@ -29,22 +29,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. MISTY FOREST BACKGROUND & GLASSMORPHISM CSS ---
-# Aap apni image URL ko niche 'bg_url' me Replace kar sakte hain
+# --- 2. BACKGROUND & STRICT VISIBILITY FIX CSS ---
 bg_url = "https://images.unsplash.com/photo-1511497584788-876761c119ef?auto=format&fit=crop&w=1920&q=80"
 
 st.markdown(f"""
 <style>
-    /* App Background with Dark Overlay for Image */
+    /* App Background with Dark Overlay */
     .stApp {{
-        background: linear-gradient(rgba(11, 14, 20, 0.75), rgba(11, 14, 20, 0.88)), 
+        background: linear-gradient(rgba(11, 14, 20, 0.78), rgba(11, 14, 20, 0.90)), 
                     url('{bg_url}') no-repeat center center fixed !important;
         background-size: cover !important;
         color: #F3F4F6 !important;
         font-family: 'Inter', -apple-system, sans-serif;
     }}
 
-    /* Keyframe Pulse Animation for Login Glow */
+    /* Glow Effect for Login Card */
     @keyframes cozyGlow {{
         0% {{ box-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }}
         50% {{ box-shadow: 0 0 30px rgba(245, 158, 11, 0.7), 0 0 15px rgba(34, 197, 94, 0.4); }}
@@ -53,7 +52,7 @@ st.markdown(f"""
 
     /* Glassmorphism Login Card Box */
     .login-box {{
-        background: rgba(17, 24, 39, 0.85) !important;
+        background: rgba(17, 24, 39, 0.88) !important;
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
         padding: 35px;
@@ -76,51 +75,66 @@ st.markdown(f"""
     .hero-header h1 {{ color: #FFFFFF !important; margin: 0; font-size: 2.2rem; font-weight: 800; }}
     .hero-header p {{ color: #FEF2F2 !important; margin: 4px 0 0 0; font-size: 0.95rem; }}
 
-    /* --- SIDEBAR & WIDGET VISIBILITY OVERRIDES --- */
+    /* Sidebar Base Styling */
     section[data-testid="stSidebar"] {{
-        background-color: rgba(3, 7, 18, 0.92) !important;
+        background-color: rgba(3, 7, 18, 0.94) !important;
         backdrop-filter: blur(10px);
         border-right: 1px solid #1F2937;
     }}
     
-    /* Universal Text Color Override */
-    label, p, span, h1, h2, h3, h4, h5, h6, div {{
+    /* Labels & Standard Text Fix */
+    label, p, span, h1, h2, h3, h4, h5, h6 {{
         color: #F9FAFB !important;
     }}
 
-    /* File Uploader FIX */
+    /* ========================================================= */
+    /* --- CRITICAL FIX FOR WHITE BOX / INVISIBLE FONT ISSUE --- */
+    /* ========================================================= */
+
+    /* 1. File Uploader Specific Targeting */
+    [data-testid="stFileUploader"] {{
+        background-color: transparent !important;
+    }}
     [data-testid="stFileUploadDropzone"] {{
-        background-color: rgba(30, 41, 59, 0.85) !important;
+        background-color: #1E293B !important;
         border: 2px dashed #F59E0B !important;
         border-radius: 10px !important;
     }}
     [data-testid="stFileUploadDropzone"] * {{
-        color: #F8FAFC !important;
         background-color: transparent !important;
+        color: #F9FAFB !important;
     }}
 
-    /* Selectbox & Multiselect FIX */
+    /* 2. BaseWeb Selectbox & Multiselect Container Fix */
     div[data-baseweb="select"] > div {{
         background-color: #1E293B !important;
         border-color: #374151 !important;
         color: #FFFFFF !important;
     }}
-    div[data-baseweb="select"] * {{
+    div[data-baseweb="select"] input {{
         color: #FFFFFF !important;
-        background-color: transparent !important;
     }}
-    div[data-baseweb="popover"] {{
+    div[data-baseweb="select"] svg {{
+        fill: #FFFFFF !important;
+    }}
+
+    /* Dropdown Popover & Options Menu Fix */
+    div[data-baseweb="popover"],
+    div[data-baseweb="menu"],
+    ul[role="listbox"] {{
         background-color: #111827 !important;
+        border: 1px solid #374151 !important;
     }}
     li[role="option"] {{
         background-color: #1E293B !important;
         color: #FFFFFF !important;
     }}
-    li[role="option"]:hover {{
-        background-color: #F59E0B !important;
+    li[role="option"]:hover, li[aria-selected="true"] {{
+        background-color: #D97706 !important;
+        color: #FFFFFF !important;
     }}
 
-    /* Multiselect Tags Styling */
+    /* Multiselect Selected Item Tags */
     span[data-baseweb="tag"] {{
         background-color: #D97706 !important;
         border-radius: 4px !important;
@@ -129,7 +143,7 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* Inputs Focus */
+    /* Input Fields Fix */
     input, textarea {{
         color: #FFFFFF !important;
         background-color: #1E293B !important;
@@ -483,12 +497,7 @@ else:
                     "PF": c2.text_input("PF (Max 12)", max_chars=12), 
                     "Aadhaar": c1.text_input("Aadhaar (Max 12)", max_chars=12), 
                     "Status": c2.selectbox("Status", ["Active", "Inactive"]), 
-                    "Designation": c2.text_input("Designation"), 
-                    "Manager": c2.text_input("Manager"), 
-                    "FatherName": c1.text_input("FatherName"), 
-                    "Email": c2.text_input("Email"), 
-                    "Address": c2.text_area("Address", height=100), 
-                    "EmergencyName": c1.text_input("EmergencyName"), 
-                    "EmergencyContact": c1.text_input("EmergencyContact"), 
-                    "ESIC": c2.text_input("ESIC"),
-                }
+                    "Designation": c2.text_input("Designat
+
+
+                                                 }
